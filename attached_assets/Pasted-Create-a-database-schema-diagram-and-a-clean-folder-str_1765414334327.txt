@@ -1,0 +1,182 @@
+Create a database schema diagram and a clean folder structure for the “Phone Contact App” using Firebase (Firestore + Firebase Auth + Cloud Functions).
+
+DATABASE: FIREBASE FIRESTORE SCHEMA
+
+Design the schema as collections + documents. Use these definitions:
+
+Collection: users
+
+Each user document:
+
+uid: string
+
+email: string
+
+createdAt: timestamp
+
+Collection: contacts
+
+Each document:
+
+id: string
+
+userId: string (owner)
+
+name: string
+
+phone: string
+
+email: string
+
+notes: string
+
+createdAt: timestamp
+
+updatedAt: timestamp
+
+Index: userId
+
+Collection: groups
+
+Each document:
+
+id: string
+
+userId: string
+
+name: string
+
+description: string
+
+backgroundInfo: string
+
+contacts: array of contact IDs
+
+schedule: array of objects:
+
+date: timestamp
+
+frequency: string (“weekly”, “monthly”, “yearly”, etc.)
+
+createdAt: timestamp
+
+updatedAt: timestamp
+
+Index: userId
+
+Collection: messageLogs
+
+Each document:
+
+id: string
+
+userId: string
+
+groupId: string
+
+messageContent: string
+
+recipients: array
+
+timestamp: timestamp
+
+Indexes: userId, groupId
+
+FIREBASE CLOUD FUNCTIONS
+
+Functions to scaffold:
+
+generateAiMessage(groupId)
+
+sendSms(groupId) (placeholder)
+
+sendEmail(groupId) (placeholder)
+
+scheduleMessageDispatch() using Cloud Scheduler
+
+logMessageSend()
+
+All functions must:
+
+Validate user permissions
+
+Use Firebase Admin SDK
+
+FULL FOLDER STRUCTURE (FRONTEND + FUNCTIONS)
+root/
+├── src/
+│   ├── components/
+│   │   ├── Auth/
+│   │   │   ├── LoginForm.jsx
+│   │   │   └── SignupForm.jsx
+│   │   ├── Contacts/
+│   │   │   ├── ContactList.jsx
+│   │   │   ├── ContactForm.jsx
+│   │   │   └── ContactItem.jsx
+│   │   ├── Groups/
+│   │   │   ├── GroupList.jsx
+│   │   │   ├── GroupForm.jsx
+│   │   │   └── GroupDetail.jsx
+│   │   └── Logs/
+│   │       └── MessageLogs.jsx
+│   │
+│   ├── pages/
+│   │   ├── LoginPage.jsx
+│   │   ├── SignupPage.jsx
+│   │   ├── Dashboard.jsx
+│   │   ├── ContactsPage.jsx
+│   │   ├── GroupsPage.jsx
+│   │   └── LogsPage.jsx
+│   │
+│   ├── hooks/
+│   │   ├── useAuth.js
+│   │   ├── useContacts.js
+│   │   ├── useGroups.js
+│   │   └── useLogs.js
+│   │
+│   ├── services/
+│   │   ├── firebase.js (Firebase client config)
+│   │   ├── authService.js
+│   │   ├── contactService.js
+│   │   ├── groupService.js
+│   │   └── logService.js
+│   │
+│   ├── context/
+│   │   └── AuthContext.jsx
+│   │
+│   ├── utils/
+│   │   └── validators.js
+│   │
+│   ├── App.jsx
+│   └── main.jsx
+│
+├── functions/
+│   ├── index.js
+│   ├── ai/
+│   │   └── generateMessage.js
+│   ├── messaging/
+│   │   ├── sendSms.js
+│   │   └── sendEmail.js
+│   ├── scheduling/
+│   │   └── scheduleJobs.js
+│   ├── logs/
+│   │   └── writeLog.js
+│   └── package.json
+│
+├── public/
+│   └── index.html
+│
+├── package.json
+└── .env
+
+FINAL INSTRUCTION FOR REPLIT
+
+Generate:
+
+The complete database diagram
+
+The entire folder structure above
+
+Stub files for each service + cloud function
+
+Firestore rules reflecting the schema

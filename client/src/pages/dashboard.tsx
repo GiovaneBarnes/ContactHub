@@ -1,14 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/mock-api";
+import { useAuth } from "@/context/AuthContext";
+import { useContacts } from "@/hooks/useContacts";
+import { useGroups } from "@/hooks/useGroups";
+import { useLogs } from "@/hooks/useLogs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, MessageSquare, History, Plus } from "lucide-react";
+import { Users, Layers, MessageSquare, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
 export default function Dashboard() {
-  const { data: contacts } = useQuery({ queryKey: ['contacts'], queryFn: api.contacts.list });
-  const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: api.groups.list });
-  const { data: logs } = useQuery({ queryKey: ['logs'], queryFn: api.logs.list });
+  const { contacts } = useContacts();
+  const { groups } = useGroups();
+  const { logs } = useLogs();
 
   const stats = [
     { label: "Total Contacts", value: contacts?.length || 0, icon: Users, color: "text-blue-500", bg: "bg-blue-50" },
