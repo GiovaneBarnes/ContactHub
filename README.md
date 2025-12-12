@@ -1,4 +1,4 @@
-# Phone Contact App
+# ContactHub
 
 A full-stack web application for managing phone contacts and groups, built with React, TypeScript, Express, and PostgreSQL.
 
