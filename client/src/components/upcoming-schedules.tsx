@@ -29,19 +29,20 @@ export function UpcomingSchedules() {
   );
 
   return (
-    <Card className="border-none shadow-sm">
-      <CardHeader>
+    <Card className="glass hover-lift animate-slide-up" style={{ animationDelay: '400ms' }}>
+      <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-orange-500" />
+          <Clock className="h-5 w-5 text-primary" />
           Upcoming Messages
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
           {upcomingOccurrences.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No upcoming scheduled messages</p>
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="h-8 w-8 mx-auto mb-3 opacity-50" />
+              <p className="text-sm font-medium">No upcoming scheduled messages</p>
+              <p className="text-xs mt-1">Configure schedules in your groups</p>
             </div>
           ) : (
             upcomingOccurrences.map((occurrence, index) => {
@@ -50,19 +51,19 @@ export function UpcomingSchedules() {
               const groupName = schedule?.groupName || 'Unknown Group';
 
               return (
-                <div key={`${occurrence.scheduleId}-${index}`} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                <div key={`${occurrence.scheduleId}-${index}`} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 interactive-card animate-fade-in" style={{ animationDelay: `${500 + index * 100}ms` }}>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="outline" className="text-xs">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="text-xs border-primary/30 text-primary hover:bg-primary/10 transition-colors">
                         {groupName}
                       </Badge>
                       {occurrence.scheduleName && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors">
                           {occurrence.scheduleName}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
                       {occurrence.date.toLocaleDateString('en-US', {
                         weekday: 'short',
                         month: 'short',
@@ -77,7 +78,7 @@ export function UpcomingSchedules() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full border border-primary/20 hover:bg-primary/20 transition-colors">
                       {getDaysUntil(occurrence.date)}
                     </div>
                   </div>

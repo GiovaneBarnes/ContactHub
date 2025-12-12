@@ -137,20 +137,21 @@ export default function GroupDetailPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {allContacts?.map(contact => (
-                  <div key={contact.id} className="flex items-start space-x-3 p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                  <div key={contact.id} className="flex items-start space-x-3 p-3 border rounded-md interactive-card group">
                     <Checkbox 
                       id={`contact-${contact.id}`} 
                       checked={group.contactIds.includes(contact.id)}
                       onCheckedChange={() => toggleContact(contact.id)}
+                      className="hover-scale"
                     />
-                    <div className="grid gap-1.5 leading-none">
+                    <div className="grid gap-1.5 leading-none flex-1">
                       <label
                         htmlFor={`contact-${contact.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer hover:text-primary transition-colors"
                       >
                         {contact.name}
                       </label>
-                      <p className="text-xs text-muted-foreground">{contact.email}</p>
+                      <p className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{contact.email}</p>
                     </div>
                   </div>
                 ))}

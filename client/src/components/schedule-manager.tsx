@@ -99,19 +99,19 @@ export function ScheduleManager({ schedules, onSchedulesChange }: ScheduleManage
           </Card>
         ) : (
           schedules.map((schedule) => (
-            <Card key={schedule.id}>
+            <Card key={schedule.id} className="interactive-card">
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <Badge variant={schedule.enabled ? 'default' : 'secondary'}>
+                      <Badge variant={schedule.enabled ? 'default' : 'secondary'} className="hover-scale">
                         {schedule.type}
                       </Badge>
                       {schedule.name && (
-                        <span className="font-medium">{schedule.name}</span>
+                        <span className="font-medium hover:text-primary transition-colors cursor-pointer">{schedule.name}</span>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                       {formatSchedule(schedule)}
                     </p>
                   </div>
@@ -120,6 +120,7 @@ export function ScheduleManager({ schedules, onSchedulesChange }: ScheduleManage
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEditSchedule(schedule)}
+                      className="interactive-button hover:text-primary"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -127,6 +128,7 @@ export function ScheduleManager({ schedules, onSchedulesChange }: ScheduleManage
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteSchedule(schedule.id)}
+                      className="interactive-button hover:text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

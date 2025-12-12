@@ -93,25 +93,25 @@ export default function GroupsPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {groups?.map((group) => (
             <Link key={group.id} href={`/groups/${group.id}`} className="block h-full">
-              <Card className="h-full hover:shadow-md transition-all cursor-pointer border-l-4 border-l-primary/0 hover:border-l-primary group">
+              <Card className="h-full interactive-card group">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-start">
-                    {group.name}
-                    <Users className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <span className="hover:text-primary transition-colors">{group.name}</span>
+                    <Users className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors hover-scale" />
                   </CardTitle>
-                  <CardDescription className="line-clamp-2">{group.description}</CardDescription>
+                  <CardDescription className="line-clamp-2 hover:text-foreground transition-colors">{group.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     <span className="font-medium text-foreground">{group.contactIds.length}</span> members
                   </div>
-                  <div className="mt-4 text-xs text-muted-foreground line-clamp-2 bg-secondary/50 p-2 rounded">
+                  <div className="mt-4 text-xs text-muted-foreground line-clamp-2 bg-secondary/50 p-2 rounded hover:bg-secondary/70 transition-colors">
                     AI Context: {group.backgroundInfo}
                   </div>
                 </CardContent>
                 <CardFooter className="pt-0">
-                  <Button variant="ghost" className="w-full justify-between hover:bg-transparent px-0 text-primary">
-                    Manage Group <ArrowRight className="h-4 w-4" />
+                  <Button variant="ghost" className="w-full justify-between interactive-button px-0 text-primary">
+                    Manage Group <ArrowRight className="h-4 w-4 hover-scale" />
                   </Button>
                 </CardFooter>
               </Card>

@@ -55,17 +55,17 @@ export default function LogsPage() {
                 </TableRow>
               ) : (
                 logs?.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                  <TableRow key={log.id} className="hover:bg-muted/50 transition-colors">
+                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap hover:text-foreground transition-colors">
                       {new Date(log.timestamp).toLocaleString()}
                     </TableCell>
-                    <TableCell className="font-medium">{log.groupName}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate" title={log.messageContent}>
+                    <TableCell className="font-medium hover:text-primary transition-colors cursor-pointer">{log.groupName}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate hover:text-foreground transition-colors" title={log.messageContent}>
                       {log.messageContent}
                     </TableCell>
-                    <TableCell>{log.recipients}</TableCell>
+                    <TableCell className="hover:text-foreground transition-colors">{log.recipients}</TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={log.status === 'sent' ? 'default' : 'destructive'}>
+                      <Badge variant={log.status === 'sent' ? 'default' : 'destructive'} className="hover-scale">
                         {log.status}
                       </Badge>
                     </TableCell>

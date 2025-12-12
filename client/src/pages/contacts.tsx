@@ -159,29 +159,29 @@ export default function ContactsPage() {
               </TableRow>
             ) : (
               filteredContacts?.map((contact) => (
-                <TableRow key={contact.id}>
+                <TableRow key={contact.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs hover-scale">
                         {contact.name.slice(0, 2).toUpperCase()}
                       </div>
-                      {contact.name}
+                      <span className="hover:text-primary transition-colors cursor-pointer">{contact.name}</span>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <div className="flex flex-col text-sm text-muted-foreground gap-1">
-                      <span className="flex items-center gap-2"><Mail className="h-3 w-3" /> {contact.email}</span>
-                      <span className="flex items-center gap-2"><Phone className="h-3 w-3" /> {contact.phone}</span>
+                    <div className="flex flex-col text-sm text-muted-foreground gap-1 hover:text-foreground transition-colors">
+                      <span className="flex items-center gap-2"><Mail className="h-3 w-3 hover-scale" /> {contact.email}</span>
+                      <span className="flex items-center gap-2"><Phone className="h-3 w-3 hover-scale" /> {contact.phone}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm max-w-[200px] truncate">
+                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm max-w-[200px] truncate hover:text-foreground transition-colors">
                     {contact.notes}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(contact)}>
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(contact)} className="interactive-button hover:text-primary">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteMutation.mutate(contact.id)}>
+                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive interactive-button" onClick={() => deleteMutation.mutate(contact.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
