@@ -16,17 +16,68 @@ let MOCK_GROUPS: Group[] = [
     id: '1', 
     name: 'Marketing Team', 
     description: 'Weekly updates for the marketing department', 
-    contactIds: ['1'], 
-    schedule: [{ date: new Date().toISOString(), frequency: 'weekly' }],
+    contactIds: ['1'],
+    schedules: [
+      {
+        id: '1',
+        type: 'recurring',
+        startDate: new Date().toISOString(),
+        frequency: {
+          type: 'weekly',
+          interval: 1,
+          daysOfWeek: [1] // Monday
+        },
+        enabled: true
+      }
+    ],
     backgroundInfo: 'Focus on upcoming campaign launches and social media metrics.'
   },
   { 
     id: '2', 
     name: 'Gym Friends', 
     description: 'Weekend workout coordination', 
-    contactIds: ['2'], 
-    schedule: [],
+    contactIds: ['2'],
+    schedules: [
+      {
+        id: '2',
+        type: 'recurring',
+        startDate: new Date().toISOString(),
+        frequency: {
+          type: 'weekly',
+          interval: 2,
+          daysOfWeek: [6] // Saturday
+        },
+        enabled: true
+      }
+    ],
     backgroundInfo: 'Casual tone, coordinate times for Saturday morning session.'
+  },
+  {
+    id: '3',
+    name: 'Family',
+    description: 'Important family updates and celebrations',
+    contactIds: [],
+    schedules: [
+      {
+        id: '3',
+        type: 'holiday',
+        name: 'Christmas',
+        startDate: '2024-12-25T00:00:00.000Z',
+        enabled: true
+      },
+      {
+        id: '4',
+        type: 'recurring',
+        startDate: new Date().toISOString(),
+        frequency: {
+          type: 'monthly',
+          interval: 1,
+          daysOfMonth: [1] // First of every month
+        },
+        enabled: true
+      }
+    ],
+    backgroundInfo: 'Warm and personal communication for family matters.'
   }
 ];
 

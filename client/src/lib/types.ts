@@ -13,8 +13,20 @@ export interface Contact {
 }
 
 export interface Schedule {
-  date: string; // ISO date string
-  frequency: 'once' | 'daily' | 'weekly' | 'monthly';
+  id: string;
+  type: 'one-time' | 'recurring' | 'holiday' | 'special-day';
+  name?: string; // For holidays/special days
+  startDate: string; // ISO date string
+  endDate?: string; // For recurring schedules with end date
+  frequency?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval: number; // every N days/weeks/months/years
+    daysOfWeek?: number[]; // 0-6, Sunday=0 for weekly
+    daysOfMonth?: number[]; // 1-31 for monthly
+    monthsOfYear?: number[]; // 0-11, January=0 for yearly
+  };
+  exceptions?: string[]; // ISO date strings to skip
+  enabled: boolean;
 }
 
 export interface Group {
@@ -22,7 +34,7 @@ export interface Group {
   name: string;
   description: string;
   contactIds: string[];
-  schedule: Schedule[];
+  schedules: Schedule[];
   backgroundInfo: string;
 }
 

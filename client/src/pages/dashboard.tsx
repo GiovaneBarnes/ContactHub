@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Layers, MessageSquare, History, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { UpcomingSchedules } from "@/components/upcoming-schedules";
 
 export default function Dashboard() {
   const { data: contacts } = useQuery({ queryKey: ['contacts'], queryFn: api.contacts.list });
@@ -41,8 +42,8 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4 border-none shadow-sm">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="col-span-1 border-none shadow-sm">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
@@ -73,7 +74,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-3 border-none shadow-sm">
+        <UpcomingSchedules />
+
+        <Card className="col-span-1 border-none shadow-sm">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>

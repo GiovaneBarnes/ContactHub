@@ -10,6 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles, Send, Users, Settings } from "lucide-react";
+import { ScheduleManager } from "@/components/schedule-manager";
+import { Schedule } from "@/lib/types";
 
 export default function GroupDetailPage() {
   const [, params] = useRoute("/groups/:id");
@@ -174,12 +176,10 @@ export default function GroupDetailPage() {
                   Update the context used by the AI to generate messages.
                 </p>
               </div>
-              <div className="space-y-2">
-                 <Label>Schedule (Mock)</Label>
-                 <div className="p-4 border rounded-md text-sm text-muted-foreground bg-muted/20">
-                    Recurring schedules would be configured here. (Feature placeholder)
-                 </div>
-              </div>
+              <ScheduleManager
+                schedules={group.schedules || []}
+                onSchedulesChange={(schedules: Schedule[]) => updateGroupMutation.mutate({ schedules })}
+              />
             </CardContent>
           </Card>
         </TabsContent>

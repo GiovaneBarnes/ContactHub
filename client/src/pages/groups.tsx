@@ -65,7 +65,7 @@ export default function GroupsPage() {
   });
 
   const onSubmit = (values: z.infer<typeof groupSchema>) => {
-    createMutation.mutate({ ...values, contactIds: [], schedule: [] });
+    createMutation.mutate({ ...values, contactIds: [], schedules: [] });
   };
 
   const openCreate = () => {
