@@ -163,6 +163,7 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
     type: schedule?.type || 'recurring',
     name: schedule?.name || '',
     startDate: schedule?.startDate || new Date().toISOString().split('T')[0],
+    startTime: schedule?.startTime || '09:00',
     endDate: schedule?.endDate || '',
     frequency: schedule?.frequency || {
       type: 'weekly',
@@ -183,6 +184,7 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
       type: formData.type as Schedule['type'],
       name: formData.name,
       startDate: formData.startDate,
+      startTime: formData.startTime,
       endDate: formData.endDate,
       frequency: formData.frequency,
       exceptions: formData.exceptions,
@@ -250,6 +252,16 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
               value={formData.startDate}
               onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Start Time</Label>
+            <Input
+              type="time"
+              value={formData.startTime || '09:00'}
+              onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">When should the message be sent?</p>
           </div>
 
           {/* End Date (for recurring) */}

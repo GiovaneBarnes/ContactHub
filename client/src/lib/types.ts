@@ -17,6 +17,7 @@ export interface Schedule {
   type: 'one-time' | 'recurring' | 'holiday' | 'special-day';
   name?: string; // For holidays/special days
   startDate: string; // ISO date string
+  startTime?: string; // HH:MM format (24-hour)
   endDate?: string; // For recurring schedules with end date
   frequency?: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly';

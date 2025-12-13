@@ -37,7 +37,7 @@ function getNextScheduleOccurrences(schedule: Schedule, fromDate: Date, count: n
 
   switch (schedule.type) {
     case 'one-time':
-      const oneTimeDate = new Date(schedule.startDate);
+      const oneTimeDate = combineDateAndTime(schedule.startDate, schedule.startTime);
       if (oneTimeDate >= fromDate) {
         occurrences.push(oneTimeDate);
       }
@@ -69,7 +69,7 @@ function getRecurringOccurrences(schedule: Schedule, fromDate: Date, count: numb
 
   if (!frequency) return occurrences;
 
-  let currentDate = new Date(schedule.startDate);
+  let currentDate = combineDateAndTime(schedule.startDate, schedule.startTime);
 
   // If start date is in the past, find the next valid occurrence
   if (currentDate < fromDate) {
@@ -102,27 +102,6 @@ function getRecurringOccurrences(schedule: Schedule, fromDate: Date, count: numb
         currentDate.setFullYear(currentDate.getFullYear() + frequency.interval);
         break;
     }
-  }
-
-  return occurrences;
-}
-
-/**
- * Get annual occurrences for holidays/special days
- */
-function getAnnualOccurrences(schedule: Schedule, fromDate: Date, count: number): Date[] {
-  const occurrences: Date[] = [];
-  const startDate = new Date(schedule.startDate);
-
-  let year = fromDate.getFullYear();
-  if (startDate.getMonth() < fromDate.getMonth() ||
-      (startDate.getMonth() === fromDate.getMonth() && startDate.getDate() < fromDate.getDate())) {
-    year++;
-  }
-
-  for (let i = 0; i < count; i++) {
-    const occurrence = new Date(year + i, startDate.getMonth(), startDate.getDate());
-    occurrences.push(occurrence);
   }
 
   return occurrences;
@@ -209,12 +188,57 @@ function getNextMonthDay(current: Date, daysOfMonth: number[], monthsInterval: n
 }
 
 /**
+ * Get annual occurrences for holidays/special days
+ */
+function getAnnualOccurrences(schedule: Schedule, fromDate: Date, count: number): Date[] {
+  const occurrences: Date[] = [];
+  const startDate = combineDateAndTime(schedule.startDate, schedule.startTime);
+  const currentYear = fromDate.getFullYear();
+
+  for (let i = 0; i < count; i++) {
+    const occurrenceDate = new Date(currentYear + i, startDate.getMonth(), startDate.getDate());
+    if (schedule.startTime) {
+      occurrenceDate.setHours(startDate.getHours(), startDate.getMinutes(), 0, 0);
+    }
+
+    if (occurrenceDate >= fromDate) {
+      occurrences.push(occurrenceDate);
+    }
+  }
+
+  return occurrences;
+}
+
+/**
+ * Combine date string and time string into a Date object
+ */
+function combineDateAndTime(dateStr: string, timeStr?: string): Date {
+  const date = new Date(dateStr);
+
+  if (timeStr) {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    date.setHours(hours, minutes, 0, 0);
+  } else {
+    // Default to 9 AM if no time specified
+    date.setHours(9, 0, 0, 0);
+  }
+
+  return date;
+}
+
+/**
  * Format a schedule for display
  */
 export function formatSchedule(schedule: Schedule): string {
+  const timeStr = schedule.startTime ? ` at ${new Date(`2000-01-01T${schedule.startTime}`).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })}` : '';
+
   switch (schedule.type) {
     case 'one-time':
-      return `Once on ${new Date(schedule.startDate).toLocaleDateString()}`;
+      return `Once on ${new Date(schedule.startDate).toLocaleDateString()}${timeStr}`;
 
     case 'recurring':
       if (!schedule.frequency) return 'Invalid recurring schedule';
@@ -239,11 +263,11 @@ export function formatSchedule(schedule: Schedule): string {
         description += ` on day${schedule.frequency.daysOfMonth.length > 1 ? 's' : ''} ${schedule.frequency.daysOfMonth.join(', ')}`;
       }
 
-      return description;
+      return description + timeStr;
 
     case 'holiday':
     case 'special-day':
-      return `${schedule.name || 'Special Day'} (${new Date(schedule.startDate).toLocaleDateString()})`;
+      return `${schedule.name || 'Special Day'} (${new Date(schedule.startDate).toLocaleDateString()}${timeStr})`;
 
     default:
       return 'Unknown schedule type';

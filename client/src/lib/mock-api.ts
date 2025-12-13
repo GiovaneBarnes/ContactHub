@@ -22,6 +22,7 @@ let MOCK_GROUPS: Group[] = [
         id: '1',
         type: 'recurring',
         startDate: new Date().toISOString(),
+        startTime: '09:00',
         frequency: {
           type: 'weekly',
           interval: 1,
@@ -42,6 +43,7 @@ let MOCK_GROUPS: Group[] = [
         id: '2',
         type: 'recurring',
         startDate: new Date().toISOString(),
+        startTime: '08:00',
         frequency: {
           type: 'weekly',
           interval: 2,
@@ -159,6 +161,32 @@ export const api = {
     delete: async (id: string): Promise<void> => {
       await delay(300);
       MOCK_GROUPS = MOCK_GROUPS.filter(g => g.id !== id);
+    },
+    updateSchedule: async (groupId: string, scheduleId: string, updates: Partial<import('./types').Schedule>): Promise<Group> => {
+      await delay(300);
+      MOCK_GROUPS = MOCK_GROUPS.map(g => {
+        if (g.id === groupId) {
+          return {
+            ...g,
+            schedules: g.schedules.map(s => s.id === scheduleId ? { ...s, ...updates } : s)
+          };
+        }
+        return g;
+      });
+      return MOCK_GROUPS.find(g => g.id === groupId)!;
+    },
+    deleteSchedule: async (groupId: string, scheduleId: string): Promise<Group> => {
+      await delay(300);
+      MOCK_GROUPS = MOCK_GROUPS.map(g => {
+        if (g.id === groupId) {
+          return {
+            ...g,
+            schedules: g.schedules.filter(s => s.id !== scheduleId)
+          };
+        }
+        return g;
+      });
+      return MOCK_GROUPS.find(g => g.id === groupId)!;
     }
   },
   logs: {

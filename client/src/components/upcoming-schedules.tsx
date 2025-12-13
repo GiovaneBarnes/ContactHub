@@ -1,16 +1,122 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/mock-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Edit, Trash2, MessageSquare } from 'lucide-react';
 import { getNextOccurrences } from '@/lib/schedule-utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Schedule } from '@/lib/types';
 
 export function UpcomingSchedules() {
+  const [selectedOccurrence, setSelectedOccurrence] = useState<{
+    occurrence: any;
+    schedule: Schedule & { groupId?: string };
+    groupName: string;
+  } | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editedMessage, setEditedMessage] = useState('');
+  const [editedDate, setEditedDate] = useState('');
+  const [editedTime, setEditedTime] = useState('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const { data: groups } = useQuery({
     queryKey: ['groups'],
     queryFn: api.groups.list
   });
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: ({ groupId, scheduleId, updates }: { groupId: string; scheduleId: string; updates: Partial<Schedule> }) => {
+      return api.groups.updateSchedule(groupId, scheduleId, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      toast({ title: "Schedule updated successfully" });
+      setIsEditModalOpen(false);
+      setSelectedOccurrence(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to update schedule", variant: "destructive" });
+    }
+  });
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: ({ groupId, scheduleId }: { groupId: string; scheduleId: string }) => {
+      return api.groups.deleteSchedule(groupId, scheduleId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      toast({ title: "Schedule deleted successfully" });
+      setIsEditModalOpen(false);
+      setSelectedOccurrence(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to delete schedule", variant: "destructive" });
+    }
+  });
+
+  const handleCardClick = (occurrence: any, schedule: Schedule, groupName: string) => {
+    // Only allow editing if the occurrence is in the future
+    if (occurrence.date > new Date()) {
+      // Find the group that contains this schedule
+      const group = groups?.find(g => g.schedules.some(s => s.id === schedule.id));
+      if (group) {
+      setSelectedOccurrence({ occurrence, schedule: { ...schedule, groupId: group.id }, groupName });
+      setEditedMessage(''); // We'll generate this when the modal opens
+      setEditedDate(occurrence.date.toISOString().split('T')[0]);
+      setEditedTime(occurrence.date.toTimeString().slice(0, 5)); // HH:MM format
+      setIsEditModalOpen(true);
+      }
+    }
+  };
+
+  const handleSaveChanges = () => {
+    if (!selectedOccurrence) return;
+
+    const updates: Partial<Schedule> = {};
+
+    // If date changed, update the schedule
+    if (editedDate !== selectedOccurrence.occurrence.date.toISOString().split('T')[0]) {
+      updates.startDate = editedDate;
+    }
+
+    // If time changed, update the schedule
+    if (editedTime !== selectedOccurrence.occurrence.date.toTimeString().slice(0, 5)) {
+      updates.startTime = editedTime;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      updateScheduleMutation.mutate({
+        groupId: selectedOccurrence.schedule.groupId || '',
+        scheduleId: selectedOccurrence.schedule.id,
+        updates
+      });
+    } else {
+      setIsEditModalOpen(false);
+      setSelectedOccurrence(null);
+    }
+  };
+
+  const handleDeleteSchedule = () => {
+    if (!selectedOccurrence) return;
+
+    deleteScheduleMutation.mutate({
+      groupId: selectedOccurrence.schedule.groupId || '',
+      scheduleId: selectedOccurrence.schedule.id
+    });
+  };
 
   // Collect all schedules from all groups
   const allSchedules = groups?.flatMap(group =>
@@ -51,7 +157,12 @@ export function UpcomingSchedules() {
               const groupName = schedule?.groupName || 'Unknown Group';
 
               return (
-                <div key={`${occurrence.scheduleId}-${index}`} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 interactive-card animate-fade-in" style={{ animationDelay: `${500 + index * 100}ms` }}>
+                <div
+                  key={`${occurrence.scheduleId}-${index}`}
+                  className={`flex items-center justify-between p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 interactive-card animate-fade-in ${occurrence.date > new Date() ? 'cursor-pointer hover:shadow-md' : 'cursor-not-allowed opacity-60'}`}
+                  style={{ animationDelay: `${500 + index * 100}ms` }}
+                  onClick={() => schedule && handleCardClick(occurrence, schedule, groupName)}
+                >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="outline" className="text-xs border-primary/30 text-primary hover:bg-primary/10 transition-colors">
@@ -63,7 +174,7 @@ export function UpcomingSchedules() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
+                    <p className="text-sm font-semibold text-foreground hover:text-primary transition-colors">
                       {occurrence.date.toLocaleDateString('en-US', {
                         weekday: 'short',
                         month: 'short',
@@ -81,6 +192,12 @@ export function UpcomingSchedules() {
                     <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full border border-primary/20 hover:bg-primary/20 transition-colors">
                       {getDaysUntil(occurrence.date)}
                     </div>
+                    {occurrence.date > new Date() && (
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Edit className="h-3 w-3" />
+                        Click to edit
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -88,6 +205,99 @@ export function UpcomingSchedules() {
           )}
         </div>
       </CardContent>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Edit Upcoming Message
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedOccurrence && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 p-3 rounded-lg">
+                <div className="text-sm font-medium">{selectedOccurrence.groupName}</div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedOccurrence.schedule.name || 'Scheduled Message'}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Original: {selectedOccurrence.occurrence.date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="message">Message Content</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Enter the message that will be sent..."
+                  value={editedMessage}
+                  onChange={(e) => setEditedMessage(e.target.value)}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This message will be sent to all contacts in the group
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date">Scheduled Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={editedDate}
+                  onChange={(e) => setEditedDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="time">Scheduled Time</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  value={editedTime}
+                  onChange={(e) => setEditedTime(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Choose when the message should be sent (12-hour format with AM/PM)
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSchedule}
+              disabled={deleteScheduleMutation.isPending}
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Schedule
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveChanges}
+              disabled={updateScheduleMutation.isPending}
+            >
+              {updateScheduleMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
