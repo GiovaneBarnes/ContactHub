@@ -42,6 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added CSS utility classes for modern hover effects and animations
 - Enhanced component styling with interactive states and transitions
 
+### Added (Unreleased)
+- **Schedule Time Support**: Added `startTime` to the `Schedule` interface to support precise send times (HH:MM). Schedules can now include both date and time (AM/PM) for one-time and recurring events.
+- **Editable Upcoming Messages Modal**: Upcoming message cards on the dashboard are now clickable (future occurrences only) and open a modal allowing:
+  - Editing the message content that will be sent
+  - Changing the scheduled date and time
+  - Deleting the scheduled message
+  - Editability is restricted to future occurrences; past occurrences are read-only and cannot be edited.
+
+### Technical Notes
+- `combineDateAndTime()` utility added to merge `startDate` and `startTime` into a single `Date` for occurrence calculations.
+- `getAnnualOccurrences()` adjusted to respect `startTime` when present.
 ## [1.0.0] - 2025-12-12
 
 ### Added
