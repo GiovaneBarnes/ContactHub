@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/mock-api";
 import { Contact } from "@/lib/types";
@@ -46,6 +46,16 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Auto-open create modal if ?create=true is in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('create') === 'true') {
+      setIsOpen(true);
+      // Clean up the URL by navigating to /contacts without query params
+      window.history.replaceState(null, '', '/contacts');
+    }
+  }, []);
 
   const { data: contacts, isLoading } = useQuery({ 
     queryKey: ['contacts'], 

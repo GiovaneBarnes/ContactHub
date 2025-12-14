@@ -1,15 +1,106 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/mock-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, MessageSquare, History, Plus } from "lucide-react";
+import { Users, Layers, MessageSquare, History, Plus, Send, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { UpcomingSchedules } from "@/components/upcoming-schedules";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [messageContent, setMessageContent] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [sendImmediately, setSendImmediately] = useState(true);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const { data: contacts } = useQuery({ queryKey: ['contacts'], queryFn: api.contacts.list });
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: api.groups.list });
   const { data: logs } = useQuery({ queryKey: ['logs'], queryFn: api.logs.list });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: ({ groupId, content }: { groupId: string; content: string }) => {
+      return api.messaging.send(groupId, content, ['sms', 'email']);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+      toast({ title: "Message sent successfully" });
+      handleCloseDraftModal();
+    },
+    onError: () => {
+      toast({ title: "Failed to send message", variant: "destructive" });
+    }
+  });
+
+  const scheduleMessageMutation = useMutation({
+    mutationFn: ({ groupId, schedule }: { groupId: string; schedule: any }) => {
+      return api.groups.createSchedule(groupId, schedule);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      toast({ title: "Message scheduled successfully" });
+      handleCloseDraftModal();
+    },
+    onError: () => {
+      toast({ title: "Failed to schedule message", variant: "destructive" });
+    }
+  });
+
+  const handleOpenDraftModal = () => {
+    setIsDraftModalOpen(true);
+  };
+
+  const handleCloseDraftModal = () => {
+    setIsDraftModalOpen(false);
+    setSelectedGroupId("");
+    setMessageContent("");
+    setScheduledDate("");
+    setScheduledTime("");
+    setSendImmediately(true);
+  };
+
+  const handleSendMessage = () => {
+    if (!selectedGroupId || !messageContent.trim()) {
+      toast({ title: "Please select a group and enter a message", variant: "destructive" });
+      return;
+    }
+
+    if (sendImmediately) {
+      sendMessageMutation.mutate({ groupId: selectedGroupId, content: messageContent });
+    } else {
+      if (!scheduledDate || !scheduledTime) {
+        toast({ title: "Please select date and time for scheduling", variant: "destructive" });
+        return;
+      }
+
+      const scheduleDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+      const schedule = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: 'one-time' as const,
+        name: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
+        startDate: scheduleDateTime.toISOString().split('T')[0],
+        startTime: scheduledTime,
+        enabled: true
+      };
+
+      scheduleMessageMutation.mutate({ groupId: selectedGroupId, schedule });
+    }
+  };
 
   const stats = [
     {
@@ -123,7 +214,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3">
-              <Link href="/contacts" className="group">
+              <Link href="/contacts?create=true" className="group">
                 <div className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 hover-lift hover-glow transition-all duration-300 cursor-pointer">
                   <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 group-hover:scale-110 transition-transform duration-300">
                     <Users className="h-6 w-6 text-blue-400" />
@@ -138,7 +229,7 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              <Link href="/groups" className="group">
+              <Link href="/groups?create=true" className="group">
                 <div className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 hover-lift hover-glow transition-all duration-300 cursor-pointer">
                   <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 group-hover:scale-110 transition-transform duration-300">
                     <Layers className="h-6 w-6 text-purple-400" />
@@ -153,7 +244,7 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              <Link href="/groups" className="group">
+              <button onClick={handleOpenDraftModal} className="group w-full text-left">
                 <div className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 hover-lift hover-glow transition-all duration-300 cursor-pointer">
                   <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/30 group-hover:scale-110 transition-transform duration-300">
                     <MessageSquare className="h-6 w-6 text-emerald-400" />
@@ -163,14 +254,141 @@ export default function Dashboard() {
                     <p className="text-sm text-muted-foreground">Compose and send group messages</p>
                   </div>
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <Plus className="h-5 w-5 text-emerald-400" />
+                    <Send className="h-5 w-5 text-emerald-400" />
                   </div>
                 </div>
-              </Link>
+              </button>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Draft Message Modal */}
+      <Dialog open={isDraftModalOpen} onOpenChange={setIsDraftModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Draft Message
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="group">Select Group</Label>
+              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a group to message" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups?.map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name} ({group.contactIds.length} members)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="message">Message Content</Label>
+              <Textarea
+                id="message"
+                placeholder="Enter your message..."
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                This message will be sent to all contacts in the selected group
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="send-now"
+                  name="send-option"
+                  checked={sendImmediately}
+                  onChange={() => setSendImmediately(true)}
+                  className="text-primary"
+                />
+                <Label htmlFor="send-now" className="flex items-center gap-2 cursor-pointer">
+                  <Send className="h-4 w-4" />
+                  Send immediately
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="schedule"
+                  name="send-option"
+                  checked={!sendImmediately}
+                  onChange={() => setSendImmediately(false)}
+                  className="text-primary"
+                />
+                <Label htmlFor="schedule" className="flex items-center gap-2 cursor-pointer">
+                  <Clock className="h-4 w-4" />
+                  Schedule for later
+                </Label>
+              </div>
+
+              {!sendImmediately && (
+                <div className="ml-6 space-y-2 border-l-2 border-muted pl-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="date">Scheduled Date</Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      value={scheduledDate}
+                      onChange={(e) => setScheduledDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="time">Scheduled Time</Label>
+                    <Input
+                      id="time"
+                      type="time"
+                      value={scheduledTime}
+                      onChange={(e) => setScheduledTime(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Choose when the message should be sent
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={handleCloseDraftModal}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendMessage}
+              disabled={sendMessageMutation.isPending || scheduleMessageMutation.isPending}
+              className="flex items-center gap-2"
+            >
+              {sendMessageMutation.isPending || scheduleMessageMutation.isPending ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  {sendImmediately ? 'Sending...' : 'Scheduling...'}
+                </>
+              ) : (
+                <>
+                  {sendImmediately ? <Send className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                  {sendImmediately ? 'Send Now' : 'Schedule Message'}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

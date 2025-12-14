@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/mock-api";
 import { Group } from "@/lib/types";
@@ -44,6 +44,16 @@ export default function GroupsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Auto-open create modal if ?create=true is in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('create') === 'true') {
+      setIsOpen(true);
+      // Clean up the URL by navigating to /groups without query params
+      window.history.replaceState(null, '', '/groups');
+    }
+  }, []);
 
   const { data: groups, isLoading } = useQuery({ 
     queryKey: ['groups'], 

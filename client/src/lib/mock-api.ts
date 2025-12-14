@@ -187,6 +187,20 @@ export const api = {
         return g;
       });
       return MOCK_GROUPS.find(g => g.id === groupId)!;
+    },
+    createSchedule: async (groupId: string, schedule: Omit<import('./types').Schedule, 'id'>): Promise<Group> => {
+      await delay(300);
+      MOCK_GROUPS = MOCK_GROUPS.map(g => {
+        if (g.id === groupId) {
+          const newSchedule = { ...schedule, id: Math.random().toString(36).substr(2, 9) };
+          return {
+            ...g,
+            schedules: [...g.schedules, newSchedule]
+          };
+        }
+        return g;
+      });
+      return MOCK_GROUPS.find(g => g.id === groupId)!;
     }
   },
   logs: {
