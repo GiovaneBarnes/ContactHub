@@ -14,7 +14,7 @@ export interface Contact {
 
 export interface Schedule {
   id: string;
-  type: 'one-time' | 'recurring' | 'holiday' | 'special-day';
+  type: 'one-time' | 'recurring';
   name?: string; // For holidays/special days
   startDate: string; // ISO date string
   startTime?: string; // HH:MM format (24-hour)

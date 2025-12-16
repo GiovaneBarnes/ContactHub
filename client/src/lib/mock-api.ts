@@ -62,7 +62,7 @@ let MOCK_GROUPS: Group[] = [
     schedules: [
       {
         id: '3',
-        type: 'holiday',
+        type: 'one-time',
         name: 'Christmas',
         startDate: '2024-12-25T00:00:00.000Z',
         enabled: true

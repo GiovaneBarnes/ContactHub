@@ -46,12 +46,6 @@ function getNextScheduleOccurrences(schedule: Schedule, fromDate: Date, count: n
     case 'recurring':
       occurrences.push(...getRecurringOccurrences(schedule, fromDate, count));
       break;
-
-    case 'holiday':
-    case 'special-day':
-      // For holidays/special days, they occur annually on the same date
-      occurrences.push(...getAnnualOccurrences(schedule, fromDate, count));
-      break;
   }
 
   // Filter out exceptions
@@ -238,7 +232,8 @@ export function formatSchedule(schedule: Schedule): string {
 
   switch (schedule.type) {
     case 'one-time':
-      return `Once on ${new Date(schedule.startDate).toLocaleDateString()}${timeStr}`;
+      const dateStr = new Date(schedule.startDate).toLocaleDateString();
+      return schedule.name ? `${schedule.name} (${dateStr}${timeStr})` : `Once on ${dateStr}${timeStr}`;
 
     case 'recurring':
       if (!schedule.frequency) return 'Invalid recurring schedule';
@@ -264,10 +259,6 @@ export function formatSchedule(schedule: Schedule): string {
       }
 
       return description + timeStr;
-
-    case 'holiday':
-    case 'special-day':
-      return `${schedule.name || 'Special Day'} (${new Date(schedule.startDate).toLocaleDateString()}${timeStr})`;
 
     default:
       return 'Unknown schedule type';

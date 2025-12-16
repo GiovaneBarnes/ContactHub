@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Modern gradients and animations for dashboard stats cards
   - Enhanced visual feedback for user interactions across all components
   - Improved accessibility with better contrast and hover states
+- **Dark Mode Support**: Complete dark mode implementation with:
+  - Theme toggle component with Light/Dark/System options
+  - Seamless theme switching throughout the entire application
+  - Dark mode optimized glassmorphism and gradient effects
+  - Persistent theme preference using next-themes
+  - Responsive theme toggle in both mobile header and desktop sidebar
 
 ### Changed
 - Updated Group interface to use `schedules` array instead of single `schedule`
@@ -33,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved group creation and editing workflows
 - Modernized dashboard layout with improved Quick Actions formatting
 - Enhanced user experience with comprehensive hover functionality and micro-interactions
+- Default schedule start date now defaults to tomorrow instead of today to prevent accidental past scheduling
+- Schedule form validation prevents selection of past dates
+- Simplified schedule types from four types (one-time, recurring, holiday, special-day) to two types (one-time, recurring) with holiday support integrated into both
 
 ### Technical Improvements
 - New `Schedule` interface with flexible frequency configuration
@@ -41,18 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type-safe schedule management throughout the application
 - Added CSS utility classes for modern hover effects and animations
 - Enhanced component styling with interactive states and transitions
-
-### Added (Unreleased)
-- **Schedule Time Support**: Added `startTime` to the `Schedule` interface to support precise send times (HH:MM). Schedules can now include both date and time (AM/PM) for one-time and recurring events.
-- **Editable Upcoming Messages Modal**: Upcoming message cards on the dashboard are now clickable (future occurrences only) and open a modal allowing:
-  - Editing the message content that will be sent
-  - Changing the scheduled date and time
-  - Deleting the scheduled message
-  - Editability is restricted to future occurrences; past occurrences are read-only and cannot be edited.
-
-### Technical Notes
-- `combineDateAndTime()` utility added to merge `startDate` and `startTime` into a single `Date` for occurrence calculations.
-- `getAnnualOccurrences()` adjusted to respect `startTime` when present.
+- `combineDateAndTime()` utility added to merge `startDate` and `startTime` into a single `Date` for occurrence calculations
+- `getAnnualOccurrences()` adjusted to respect `startTime` when present
+- ThemeProvider integration with next-themes for dark mode support
+- Holiday date calculation functions with automatic year advancement for past dates
 ## [1.0.0] - 2025-12-12
 
 ### Added

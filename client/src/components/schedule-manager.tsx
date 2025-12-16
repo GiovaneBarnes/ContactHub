@@ -11,6 +11,146 @@ import { Calendar, Clock, Plus, Trash2, Edit } from 'lucide-react';
 import { Schedule } from '@/lib/types';
 import { formatSchedule, getNextOccurrences } from '@/lib/schedule-utils';
 
+// Holiday date calculation functions
+function getThanksgivingDate(year: number): string {
+  // Thanksgiving is the 4th Thursday in November
+  const november = new Date(year, 10, 1); // November 1st
+  const firstThursday = 1 + ((11 - november.getDay()) % 7); // Find first Thursday
+  return (22 + firstThursday).toString().padStart(2, '0'); // 4th Thursday
+}
+
+function getEasterDate(year: number): string {
+  // Easter calculation using Meeus/Jones/Butcher algorithm
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+}
+
+function getMothersDayDate(year: number): string {
+  // Mother's Day is the 2nd Sunday in May
+  const may = new Date(year, 4, 1); // May 1st
+  const firstSunday = 1 + ((7 - may.getDay()) % 7); // Find first Sunday
+  const mothersDay = firstSunday + 7; // 2nd Sunday
+  return mothersDay.toString().padStart(2, '0');
+}
+
+function getFathersDayDate(year: number): string {
+  // Father's Day is the 3rd Sunday in June
+  const june = new Date(year, 5, 1); // June 1st
+  const firstSunday = 1 + ((7 - june.getDay()) % 7); // Find first Sunday
+  const fathersDay = firstSunday + 14; // 3rd Sunday
+  return fathersDay.toString().padStart(2, '0');
+}
+
+function getLaborDayDate(year: number): string {
+  // Labor Day is the 1st Monday in September
+  const september = new Date(year, 8, 1); // September 1st
+  const firstMonday = 1 + ((8 - september.getDay()) % 7); // Find first Monday
+  return firstMonday.toString().padStart(2, '0');
+}
+
+function getHolidayNameForDate(dateString: string): string | null {
+  const year = new Date(dateString).getFullYear();
+  const holidayDates: Record<string, { date: string; name: string }> = {
+    'christmas': { date: getHolidayDateForYear('christmas', year), name: 'Christmas' },
+    'thanksgiving': { date: getHolidayDateForYear('thanksgiving', year), name: 'Thanksgiving' },
+    'new-year': { date: getHolidayDateForYear('new-year', year), name: 'New Year' },
+    'valentines': { date: getHolidayDateForYear('valentines', year), name: 'Valentine\'s Day' },
+    'easter': { date: getHolidayDateForYear('easter', year), name: 'Easter' },
+    'mothers-day': { date: getHolidayDateForYear('mothers-day', year), name: 'Mother\'s Day' },
+    'fathers-day': { date: getHolidayDateForYear('fathers-day', year), name: 'Father\'s Day' },
+    'labor-day': { date: getHolidayDateForYear('labor-day', year), name: 'Labor Day' },
+    'halloween': { date: getHolidayDateForYear('halloween', year), name: 'Halloween' },
+    'independence-day': { date: getHolidayDateForYear('independence-day', year), name: 'Independence Day' },
+  };
+
+  for (const holiday of Object.values(holidayDates)) {
+    if (holiday.date === dateString) {
+      return holiday.name;
+    }
+  }
+  return null;
+}
+
+function getHolidayDateForYear(holiday: string, year: number): string {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  
+  let date: string;
+  
+  switch (holiday) {
+    case 'christmas':
+      date = `${year}-12-25`;
+      break;
+    case 'thanksgiving':
+      date = `${year}-11-${getThanksgivingDate(year)}`;
+      break;
+    case 'new-year':
+      date = `${year}-01-01`;
+      break;
+    case 'valentines':
+      date = `${year}-02-14`;
+      break;
+    case 'easter':
+      date = getEasterDate(year);
+      break;
+    case 'mothers-day':
+      date = `${year}-05-${getMothersDayDate(year)}`;
+      break;
+    case 'fathers-day':
+      date = `${year}-06-${getFathersDayDate(year)}`;
+      break;
+    case 'labor-day':
+      date = `${year}-09-${getLaborDayDate(year)}`;
+      break;
+    case 'halloween':
+      date = `${year}-10-31`;
+      break;
+    case 'independence-day':
+      date = `${year}-07-04`;
+      break;
+    default:
+      return `${year}-01-01`;
+  }
+  
+  // If the holiday date has already passed this year, use next year
+  const holidayDate = new Date(date);
+  if (year === currentYear && holidayDate < today) {
+    return getHolidayDateForYear(holiday, year + 1);
+  }
+  
+  return date;
+}
+
+function getHolidayKeyFromName(name: string): string | null {
+  const holidayMap: Record<string, string> = {
+    'Christmas': 'christmas',
+    'Thanksgiving': 'thanksgiving',
+    'New Year': 'new-year',
+    'Valentine\'s Day': 'valentines',
+    'Easter': 'easter',
+    'Mother\'s Day': 'mothers-day',
+    'Father\'s Day': 'fathers-day',
+    'Labor Day': 'labor-day',
+    'Halloween': 'halloween',
+    'Independence Day': 'independence-day',
+  };
+
+  return holidayMap[name] || null;
+}
+
 interface ScheduleManagerProps {
   schedules: Schedule[];
   onSchedulesChange: (schedules: Schedule[]) => void;
@@ -158,26 +298,135 @@ interface ScheduleDialogProps {
 }
 
 function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogProps) {
-  const [formData, setFormData] = useState<Partial<Schedule>>(() => ({
-    id: schedule?.id || crypto.randomUUID(),
-    type: schedule?.type || 'recurring',
-    name: schedule?.name || '',
-    startDate: schedule?.startDate || new Date().toISOString().split('T')[0],
-    startTime: schedule?.startTime || '09:00',
-    endDate: schedule?.endDate || '',
-    frequency: schedule?.frequency || {
-      type: 'weekly',
-      interval: 1,
-      daysOfWeek: [],
-      daysOfMonth: [],
-      monthsOfYear: []
-    },
-    exceptions: schedule?.exceptions || [],
-    enabled: schedule?.enabled ?? true
-  }));
+  const [formData, setFormData] = useState<Partial<Schedule>>(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return {
+      id: schedule?.id || crypto.randomUUID(),
+      type: schedule?.type || 'recurring',
+      name: schedule?.name || '',
+      startDate: schedule?.startDate || tomorrow.toISOString().split('T')[0],
+      startTime: schedule?.startTime || '09:00',
+      endDate: schedule?.endDate || '',
+      frequency: schedule?.frequency || {
+        type: 'weekly',
+        interval: 1,
+        daysOfWeek: [],
+        daysOfMonth: [],
+        monthsOfYear: []
+      },
+      exceptions: schedule?.exceptions || [],
+      enabled: schedule?.enabled ?? true
+    };
+  });
+
+  // Update formData when schedule prop changes (for editing existing schedules)
+  React.useEffect(() => {
+    if (schedule) {
+      setFormData({
+        id: schedule.id,
+        type: schedule.type,
+        name: schedule.name || '',
+        startDate: schedule.startDate,
+        startTime: schedule.startTime || '09:00',
+        endDate: schedule.endDate || '',
+        frequency: schedule.frequency || {
+          type: 'weekly',
+          interval: 1,
+          daysOfWeek: [],
+          daysOfMonth: [],
+          monthsOfYear: []
+        },
+        exceptions: schedule.exceptions || [],
+        enabled: schedule.enabled ?? true
+      });
+    } else {
+      // Reset to defaults for new schedule
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      setFormData({
+        id: crypto.randomUUID(),
+        type: 'recurring',
+        name: '',
+        startDate: tomorrow.toISOString().split('T')[0],
+        startTime: '09:00',
+        endDate: '',
+        frequency: {
+          type: 'weekly',
+          interval: 1,
+          daysOfWeek: [],
+          daysOfMonth: [],
+          monthsOfYear: []
+        },
+        exceptions: [],
+        enabled: true
+      });
+    }
+  }, [schedule]);
+
+  const [validationError, setValidationError] = useState<string>('');
+
+  // Update form data when schedule prop changes (for editing)
+  React.useEffect(() => {
+    if (schedule) {
+      setFormData({
+        id: schedule.id,
+        type: schedule.type,
+        name: schedule.name,
+        startDate: schedule.startDate,
+        startTime: schedule.startTime,
+        endDate: schedule.endDate,
+        frequency: schedule.frequency,
+        exceptions: schedule.exceptions,
+        enabled: schedule.enabled
+      });
+    } else {
+      // Reset to defaults for new schedule
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      setFormData({
+        id: crypto.randomUUID(),
+        type: 'recurring',
+        name: '',
+        startDate: tomorrow.toISOString().split('T')[0],
+        startTime: '09:00',
+        endDate: '',
+        frequency: {
+          type: 'weekly',
+          interval: 1,
+          daysOfWeek: [],
+          daysOfMonth: [],
+          monthsOfYear: []
+        },
+        exceptions: [],
+        enabled: true
+      });
+    }
+  }, [schedule]);
+
+  // Clear validation error when relevant fields change
+  React.useEffect(() => {
+    if (validationError) {
+      setValidationError('');
+    }
+  }, [formData.startDate, formData.endDate]);
 
   const handleSave = () => {
-    if (!formData.startDate) return;
+    setValidationError('');
+
+    if (!formData.startDate) {
+      setValidationError('Start date is required');
+      return;
+    }
+
+    // Validate end date is not before start date
+    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+      setValidationError('End date cannot be before start date');
+      return;
+    }
 
     const newSchedule: Schedule = {
       id: formData.id!,
@@ -226,21 +475,56 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
               <SelectContent>
                 <SelectItem value="one-time">One-time</SelectItem>
                 <SelectItem value="recurring">Recurring</SelectItem>
-                <SelectItem value="holiday">Holiday</SelectItem>
-                <SelectItem value="special-day">Special Day</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Name (for holidays/special days) */}
-          {(formData.type === 'holiday' || formData.type === 'special-day') && (
+          {/* Quick Holiday Selection (for one-time) */}
+          {formData.type === 'one-time' && (
             <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                value={formData.name || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g., Christmas, Birthday"
-              />
+              <Label>Quick Select Holiday (optional)</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.name ? getHolidayKeyFromName(formData.name) || "" : ""}
+                  onValueChange={(value) => {
+                    const currentYear = new Date().getFullYear();
+                    const holidayDate = getHolidayDateForYear(value, currentYear);
+                    
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      startDate: holidayDate,
+                      name: value.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Choose a holiday or select date manually" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="christmas">Christmas (Dec 25)</SelectItem>
+                    <SelectItem value="thanksgiving">Thanksgiving (Nov)</SelectItem>
+                    <SelectItem value="new-year">New Year's Day (Jan 1)</SelectItem>
+                    <SelectItem value="valentines">Valentine's Day (Feb 14)</SelectItem>
+                    <SelectItem value="easter">Easter</SelectItem>
+                    <SelectItem value="mothers-day">Mother's Day</SelectItem>
+                    <SelectItem value="fathers-day">Father's Day</SelectItem>
+                    <SelectItem value="labor-day">Labor Day</SelectItem>
+                    <SelectItem value="halloween">Halloween (Oct 31)</SelectItem>
+                    <SelectItem value="independence-day">Independence Day (Jul 4)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {formData.name && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFormData(prev => ({ ...prev, name: '', startDate: new Date().toISOString().split('T')[0] }))}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Select a holiday to auto-fill the date, or enter manually below</p>
             </div>
           )}
 
@@ -250,8 +534,18 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
             <Input
               type="date"
               value={formData.startDate}
-              onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => {
+                const newDate = e.target.value;
+                const holidayName = getHolidayNameForDate(newDate);
+                setFormData(prev => ({ 
+                  ...prev, 
+                  startDate: newDate,
+                  name: holidayName || (prev.name && !holidayName ? '' : prev.name) // Clear name if date doesn't match holiday
+                }));
+              }}
             />
+            <p className="text-xs text-muted-foreground">Cannot select dates in the past</p>
           </div>
 
           <div className="space-y-2">
@@ -271,8 +565,10 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
               <Input
                 type="date"
                 value={formData.endDate || ''}
+                min={formData.startDate}
                 onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
               />
+              <p className="text-xs text-muted-foreground">When should the recurring schedule end? (optional)</p>
             </div>
           )}
 
@@ -373,6 +669,12 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
             <Label htmlFor="enabled">Enabled</Label>
           </div>
         </div>
+
+        {validationError && (
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3 mt-4">
+            {validationError}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="outline" onClick={onClose}>
