@@ -119,7 +119,7 @@ export default function GroupsPage() {
   });
 
   const onSubmit = (values: z.infer<typeof groupSchema>) => {
-    createMutation.mutate({ ...values, contactIds: [], schedules: [] });
+    createMutation.mutate({ ...values, contactIds: [], schedules: [], enabled: true });
   };
 
   const openCreate = () => {
@@ -184,32 +184,32 @@ export default function GroupsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-display font-bold tracking-tight">Groups</h2>
-          <p className="text-muted-foreground mt-1">Organize contacts and automate messages</p>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl sm:text-3xl font-display font-bold tracking-tight">Groups</h2>
+          <p className="text-muted-foreground text-sm sm:text-base">Organize contacts and automate messages</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {isSelectionMode ? (
-            <>
-              <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedGroups.size === 0}>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedGroups.size === 0} className="flex-1 sm:flex-none">
                 Clear ({selectedGroups.size})
               </Button>
-              <Button variant="outline" size="sm" onClick={selectAllGroups}>
+              <Button variant="outline" size="sm" onClick={selectAllGroups} className="flex-1 sm:flex-none">
                 Select All
               </Button>
-              <Button variant="ghost" size="sm" onClick={toggleSelectionMode}>
+              <Button variant="ghost" size="sm" onClick={toggleSelectionMode} className="flex-1 sm:flex-none">
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
-            </>
+            </div>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={toggleSelectionMode}>
+              <Button variant="outline" size="sm" onClick={toggleSelectionMode} className="w-full sm:w-auto">
                 <CheckSquare className="h-4 w-4 mr-2" />
                 Select
               </Button>
-              <Button onClick={openCreate} className="gap-2">
+              <Button onClick={openCreate} className="w-full sm:w-auto gap-2">
                 <Plus className="h-4 w-4" /> Create Group
               </Button>
             </>
@@ -220,16 +220,16 @@ export default function GroupsPage() {
       {/* Bulk Actions Bar */}
       {selectedGroups.size > 0 && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <span className="font-medium">{selectedGroups.size} groups selected</span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleBulkEnable}
                   disabled={bulkToggleEnabledMutation.isPending}
-                  className="gap-2"
+                  className="flex-1 sm:flex-none gap-2"
                 >
                   <Settings className="h-4 w-4" />
                   Enable
@@ -239,7 +239,7 @@ export default function GroupsPage() {
                   size="sm"
                   onClick={handleBulkDisable}
                   disabled={bulkToggleEnabledMutation.isPending}
-                  className="gap-2"
+                  className="flex-1 sm:flex-none gap-2"
                 >
                   <Settings className="h-4 w-4" />
                   Disable
@@ -251,7 +251,7 @@ export default function GroupsPage() {
               size="sm"
               onClick={handleBulkDelete}
               disabled={bulkDeleteMutation.isPending}
-              className="gap-2"
+              className="w-full sm:w-auto gap-2"
             >
               {bulkDeleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               Delete Selected

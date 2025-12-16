@@ -10,9 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Send, Users, Settings, Calendar, Clock, MessageSquare, BarChart3, Plus } from "lucide-react";
+import { Loader2, Sparkles, Send, Users, Settings, Calendar, Clock, MessageSquare, BarChart3, Plus, Search } from "lucide-react";
 import { ScheduleManager } from "@/components/schedule-manager";
-import { Schedule } from "@/lib/types";
+import { Schedule, Group } from "@/lib/types";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 
 export default function GroupDetailPage() {
@@ -23,6 +23,7 @@ export default function GroupDetailPage() {
   const [generatedMessage, setGeneratedMessage] = useState("");
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
 
   const { data: group, isLoading } = useQuery({
     queryKey: ['group', id],
@@ -42,6 +43,13 @@ export default function GroupDetailPage() {
     queryKey: ['contacts'],
     queryFn: api.contacts.list
   });
+
+  const filteredContacts = allContacts?.filter(c => 
+    c.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
+    c.email.toLowerCase().includes(memberSearch.toLowerCase()) ||
+    c.phone.toLowerCase().includes(memberSearch.toLowerCase()) ||
+    c.notes.toLowerCase().includes(memberSearch.toLowerCase())
+  );
 
   const updateGroupMutation = useMutation({
     mutationFn: (data: any) => api.groups.update(id!, data),
@@ -127,16 +135,15 @@ export default function GroupDetailPage() {
         <p className="text-muted-foreground">{groupDescription || group?.description}</p>
       </div>
 
-      <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl mb-8">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl mb-8">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="messaging">Messaging</TabsTrigger>
           <TabsTrigger value="schedules">Schedules</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6">
           {/* Group Stats Overview */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="interactive-card">
@@ -186,6 +193,104 @@ export default function GroupDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Group Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-primary" />
+                Group Settings
+              </CardTitle>
+              <CardDescription>
+                Configure basic group information and preferences.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Group Name</Label>
+                  <Input
+                    value={groupName}
+                    onChange={(e) => {
+                      setGroupName(e.target.value);
+                      updateGroupMutation.mutate({ name: e.target.value });
+                    }}
+                    placeholder="Enter group name"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Group Description</Label>
+                  <Input
+                    value={groupDescription}
+                    onChange={(e) => {
+                      setGroupDescription(e.target.value);
+                      updateGroupMutation.mutate({ description: e.target.value });
+                    }}
+                    placeholder="Enter group description"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>AI Background Context</Label>
+                <Textarea
+                  defaultValue={group.backgroundInfo}
+                  onChange={(e) => updateGroupMutation.mutate({ backgroundInfo: e.target.value })}
+                  className="min-h-[100px]"
+                  placeholder="Describe the group's purpose, tone, and context for AI message generation..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  This context helps the AI generate more personalized and relevant messages for your group.
+                </p>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label className="text-base font-medium">Group Status</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Control whether this group can receive messages
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={`text-sm font-medium ${
+                      group.enabled ? 'text-green-600 dark:text-green-400' : 'text-gray-500'
+                    }`}>
+                      {group.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <Button
+                      variant={group.enabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => updateGroupMutation.mutate({ enabled: !group.enabled })}
+                      className="min-w-[80px]"
+                    >
+                      {group.enabled ? "Disable" : "Enable"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                      group.enabled ? 'bg-green-500' : 'bg-gray-400'
+                    }`}></div>
+                    <div className="text-sm">
+                      <div className="font-medium mb-1">
+                        {group.enabled ? 'Group messaging is active' : 'Group messaging is disabled'}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {group.enabled
+                          ? 'This group can receive automated messages and manual sends.'
+                          : 'This group will not receive any messages until enabled.'
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Upcoming Schedules */}
           <Card>
@@ -249,9 +354,20 @@ export default function GroupDetailPage() {
               <CardTitle>Group Members</CardTitle>
               <CardDescription>Select contacts to include in this group.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2 max-w-sm">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, phone, or notes..."
+                    className="pl-9 bg-card"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {allContacts?.map(contact => (
+                {filteredContacts?.map(contact => (
                   <div key={contact.id} className="flex items-start space-x-3 p-3 border rounded-md interactive-card group">
                     <Checkbox 
                       id={`contact-${contact.id}`} 
@@ -267,6 +383,10 @@ export default function GroupDetailPage() {
                         {contact.name}
                       </label>
                       <p className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{contact.email}</p>
+                      <p className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{contact.phone}</p>
+                      {contact.notes && (
+                        <p className="text-xs text-muted-foreground group-hover:text-foreground transition-colors line-clamp-2">{contact.notes}</p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -388,104 +508,6 @@ export default function GroupDetailPage() {
                 schedules={group.schedules || []}
                 onSchedulesChange={(schedules: Schedule[]) => updateGroupMutation.mutate({ schedules })}
               />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-primary" />
-                Group Settings
-              </CardTitle>
-              <CardDescription>
-                Configure basic group information and preferences.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Group Name</Label>
-                <Input
-                  value={groupName}
-                  onChange={(e) => {
-                    setGroupName(e.target.value);
-                    updateGroupMutation.mutate({ name: e.target.value });
-                  }}
-                  placeholder="Enter group name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Group Description</Label>
-                <Textarea
-                  value={groupDescription}
-                  onChange={(e) => {
-                    setGroupDescription(e.target.value);
-                    updateGroupMutation.mutate({ description: e.target.value });
-                  }}
-                  placeholder="Enter group description"
-                  className="min-h-[80px]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>AI Background Context</Label>
-                <Textarea
-                  defaultValue={group.backgroundInfo}
-                  onChange={(e) => updateGroupMutation.mutate({ backgroundInfo: e.target.value })}
-                  className="min-h-[120px]"
-                  placeholder="Describe the group's purpose, tone, and context for AI message generation..."
-                />
-                <p className="text-xs text-muted-foreground">
-                  This context helps the AI generate more personalized and relevant messages for your group.
-                </p>
-              </div>
-
-              <div className="space-y-4 pt-6 border-t">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label className="text-base font-medium">Group Status</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Control whether this group can receive messages
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className={`text-sm font-medium ${
-                      group.enabled ? 'text-green-600 dark:text-green-400' : 'text-gray-500'
-                    }`}>
-                      {group.enabled ? 'Enabled' : 'Disabled'}
-                    </div>
-                    <Button
-                      variant={group.enabled ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => updateGroupMutation.mutate({ enabled: !group.enabled })}
-                      className="min-w-[80px]"
-                    >
-                      {group.enabled ? "Disable" : "Enable"}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="bg-muted/30 p-4 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                      group.enabled ? 'bg-green-500' : 'bg-gray-400'
-                    }`}></div>
-                    <div className="text-sm">
-                      <div className="font-medium mb-1">
-                        {group.enabled ? 'Group messaging is active' : 'Group messaging is disabled'}
-                      </div>
-                      <div className="text-muted-foreground">
-                        {group.enabled
-                          ? 'This group can receive automated messages and manual sends.'
-                          : 'This group will not receive any messages until enabled.'
-                        }
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

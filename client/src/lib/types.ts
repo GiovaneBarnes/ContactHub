@@ -48,4 +48,17 @@ export interface MessageLog {
   recipients: number; // count of recipients
   timestamp: string;
   status: 'sent' | 'failed';
+  deliveryMethod: 'sms' | 'email' | 'both';
+  recipientDetails: MessageRecipient[];
+  groupDeleted?: boolean; // Track if the associated group was deleted
+}
+
+export interface MessageRecipient {
+  contactId: string;
+  name: string;
+  email: string;
+  phone: string;
+  smsStatus: 'sent' | 'failed' | 'not_sent';
+  emailStatus: 'sent' | 'failed' | 'not_sent';
+  errorMessage?: string;
 }

@@ -22,6 +22,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
+import { validateEmail, sanitizeInput, rateLimiter, SECURITY_CONFIG } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -34,6 +36,7 @@ const signupSchema = loginSchema.extend({
 
 export default function AuthPage() {
   const { login, signup } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
@@ -47,9 +50,23 @@ export default function AuthPage() {
   });
 
   async function onLogin(values: z.infer<typeof loginSchema>) {
+    // Rate limiting
+    if (!rateLimiter.isAllowed(`login_${values.email}`, SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS, SECURITY_CONFIG.LOGIN_WINDOW_MS)) {
+      toast({ title: "Too many attempts", description: "Please wait before trying again.", variant: "destructive" });
+      return;
+    }
+
+    // Input validation and sanitization
+    const sanitizedEmail = sanitizeInput(values.email);
+    if (!validateEmail(sanitizedEmail)) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await login(values.email, values.password);
+      await login(sanitizedEmail, values.password);
+      rateLimiter.reset(`login_${values.email}`); // Reset on successful login
     } catch {
       // Handled by context
     } finally {
@@ -58,9 +75,30 @@ export default function AuthPage() {
   }
 
   async function onSignup(values: z.infer<typeof signupSchema>) {
+    // Rate limiting
+    if (!rateLimiter.isAllowed(`signup_${values.email}`, SECURITY_CONFIG.MAX_SIGNUP_ATTEMPTS, SECURITY_CONFIG.SIGNUP_WINDOW_MS)) {
+      toast({ title: "Too many attempts", description: "Please wait before trying again.", variant: "destructive" });
+      return;
+    }
+
+    // Input validation and sanitization
+    const sanitizedEmail = sanitizeInput(values.email);
+    const sanitizedName = sanitizeInput(values.name);
+
+    if (!validateEmail(sanitizedEmail)) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
+      return;
+    }
+
+    if (sanitizedName.length < 2) {
+      toast({ title: "Invalid name", description: "Name must be at least 2 characters.", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await signup(values.email, values.password, values.name);
+      await signup(sanitizedEmail, values.password, sanitizedName);
+      rateLimiter.reset(`signup_${values.email}`); // Reset on successful signup
     } catch {
       // Handled by context
     } finally {

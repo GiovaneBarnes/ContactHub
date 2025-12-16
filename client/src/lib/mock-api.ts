@@ -94,7 +94,49 @@ let MOCK_LOGS: MessageLog[] = [
     messageContent: 'Hey team, just a reminder to update your metrics for the week.',
     recipients: 1,
     timestamp: new Date(Date.now() - 86400000).toISOString(),
-    status: 'sent'
+    status: 'sent',
+    deliveryMethod: 'both',
+    recipientDetails: [
+      {
+        contactId: '1',
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '+1234567890',
+        smsStatus: 'sent',
+        emailStatus: 'sent'
+      }
+    ],
+    groupDeleted: false
+  },
+  {
+    id: '2',
+    groupId: '2',
+    groupName: 'Project Alpha',
+    messageContent: 'Project meeting moved to 3 PM tomorrow. Please confirm attendance.',
+    recipients: 2,
+    timestamp: new Date(Date.now() - 172800000).toISOString(),
+    status: 'sent',
+    deliveryMethod: 'email',
+    recipientDetails: [
+      {
+        contactId: '2',
+        name: 'Jane Smith',
+        email: 'jane@example.com',
+        phone: '+0987654321',
+        smsStatus: 'not_sent',
+        emailStatus: 'sent'
+      },
+      {
+        contactId: '3',
+        name: 'Bob Johnson',
+        email: 'bob@example.com',
+        phone: '+1122334455',
+        smsStatus: 'not_sent',
+        emailStatus: 'failed',
+        errorMessage: 'Mailbox full'
+      }
+    ],
+    groupDeleted: false
   }
 ];
 
@@ -159,11 +201,24 @@ export const api = {
     update: async (id: string, data: Partial<Group>): Promise<Group> => {
       await delay(300);
       MOCK_GROUPS = MOCK_GROUPS.map(g => g.id === id ? { ...g, ...data } : g);
+      
+      // Update group name in logs if it changed
+      if (data.name) {
+        MOCK_LOGS = MOCK_LOGS.map(log => 
+          log.groupId === id ? { ...log, groupName: data.name! } : log
+        );
+      }
+      
       return MOCK_GROUPS.find(g => g.id === id)!;
     },
     delete: async (id: string): Promise<void> => {
       await delay(300);
       MOCK_GROUPS = MOCK_GROUPS.filter(g => g.id !== id);
+      
+      // Mark logs as having deleted group instead of removing them
+      MOCK_LOGS = MOCK_LOGS.map(log => 
+        log.groupId === id ? { ...log, groupDeleted: true } : log
+      );
     },
     updateSchedule: async (groupId: string, scheduleId: string, updates: Partial<import('./types').Schedule>): Promise<Group> => {
       await delay(300);
@@ -231,6 +286,20 @@ export const api = {
       await delay(1000); // Simulate sending
       const group = MOCK_GROUPS.find(g => g.id === groupId);
       if (group) {
+        // Get contact details for recipient details
+        const contacts = MOCK_CONTACTS.filter(c => group.contactIds.includes(c.id));
+        const recipientDetails = contacts.map(contact => ({
+          contactId: contact.id,
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phone,
+          smsStatus: (channels.includes('sms') ? (Math.random() > 0.1 ? 'sent' : 'failed') : 'not_sent') as 'sent' | 'failed' | 'not_sent',
+          emailStatus: (channels.includes('email') ? (Math.random() > 0.1 ? 'sent' : 'failed') : 'not_sent') as 'sent' | 'failed' | 'not_sent',
+          errorMessage: Math.random() > 0.8 ? 'Delivery failed' : undefined
+        }));
+
+        const deliveryMethod = channels.length === 2 ? 'both' : channels[0] || 'email';
+
         MOCK_LOGS.unshift({
           id: Math.random().toString(36).substr(2, 9),
           groupId: group.id,
@@ -238,7 +307,10 @@ export const api = {
           messageContent: content,
           recipients: group.contactIds.length,
           timestamp: new Date().toISOString(),
-          status: 'sent'
+          status: 'sent',
+          deliveryMethod: deliveryMethod as 'sms' | 'email' | 'both',
+          recipientDetails,
+          groupDeleted: false
         });
       }
     }

@@ -2,9 +2,52 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import cors from "cors";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(limiter);
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.ALLOWED_ORIGINS?.split(',') || false
+    : true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 declare module "http" {
   interface IncomingMessage {
@@ -21,6 +64,39 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Input sanitization middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Sanitize query parameters
+  for (const key in req.query) {
+    if (typeof req.query[key] === 'string') {
+      req.query[key] = (req.query[key] as string).replace(/[<>]/g, '');
+    }
+  }
+
+  // Sanitize body parameters for POST/PUT requests
+  if (req.body && typeof req.body === 'object') {
+    const sanitizeObject = (obj: any): any => {
+      if (typeof obj === 'string') {
+        return obj.replace(/[<>]/g, '').trim().slice(0, 10000);
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(sanitizeObject);
+      }
+      if (obj && typeof obj === 'object') {
+        const sanitized: any = {};
+        for (const key in obj) {
+          sanitized[key] = sanitizeObject(obj[key]);
+        }
+        return sanitized;
+      }
+      return obj;
+    };
+    req.body = sanitizeObject(req.body);
+  }
+
+  next();
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
