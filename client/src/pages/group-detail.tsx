@@ -359,7 +359,7 @@ export default function GroupDetailPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by name, email, phone, or notes..."
+                    placeholder="Search contacts..."
                     className="pl-9 bg-card"
                     value={memberSearch}
                     onChange={(e) => setMemberSearch(e.target.value)}
