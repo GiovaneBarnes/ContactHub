@@ -368,17 +368,22 @@ export default function GroupDetailPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredContacts?.map(contact => (
-                  <div key={contact.id} className="flex items-start space-x-3 p-3 border rounded-md interactive-card group">
+                  <div 
+                    key={contact.id} 
+                    className="flex items-start space-x-3 p-3 border rounded-md interactive-card group cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => toggleContact(contact.id)}
+                  >
                     <Checkbox 
                       id={`contact-${contact.id}`} 
                       checked={group.contactIds.includes(contact.id)}
                       onCheckedChange={() => toggleContact(contact.id)}
                       className="hover-scale"
+                      onClick={(e) => e.stopPropagation()} // Prevent double-clicking
                     />
                     <div className="grid gap-1.5 leading-none flex-1">
                       <label
                         htmlFor={`contact-${contact.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer hover:text-primary transition-colors"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 hover:text-primary transition-colors"
                       >
                         {contact.name}
                       </label>
