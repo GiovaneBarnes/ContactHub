@@ -112,8 +112,8 @@ export default function Dashboard() {
       border: "border-blue-500/30"
     },
     {
-      label: "Active Groups",
-      value: groups?.length || 0,
+      label: "Enabled Groups",
+      value: groups?.filter(group => group.enabled).length || 0,
       icon: Layers,
       color: "text-purple-400",
       bg: "bg-gradient-to-br from-purple-500/20 to-purple-600/20",

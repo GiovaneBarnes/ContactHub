@@ -43,17 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Schedule form validation prevents selection of past dates
 - Simplified schedule types from four types (one-time, recurring, holiday, special-day) to two types (one-time, recurring) with holiday support integrated into both
 
-### Technical Improvements
-- New `Schedule` interface with flexible frequency configuration
-- `getNextOccurrences()` function for calculating upcoming schedule dates
-- `formatSchedule()` utility for human-readable schedule descriptions
-- Type-safe schedule management throughout the application
-- Added CSS utility classes for modern hover effects and animations
-- Enhanced component styling with interactive states and transitions
-- `combineDateAndTime()` utility added to merge `startDate` and `startTime` into a single `Date` for occurrence calculations
-- `getAnnualOccurrences()` adjusted to respect `startTime` when present
-- ThemeProvider integration with next-themes for dark mode support
-- Holiday date calculation functions with automatic year advancement for past dates
+### Fixed
+- **Badge Component Runtime Error**: Replaced Badge component imports with custom styled divs using consistent green/gray color schemes for status indicators
+- **Schedule Status Display**: Updated schedule display logic to properly show disabled schedules with appropriate status indicators instead of misleading "No upcoming schedules" messages
+- **Cursor Pointer Styling**: Added `cursor-pointer` to interactive CSS classes (`interactive-card`, `interactive-button`, `hover-scale`) to ensure all clickable elements show proper cursor feedback
+
+### Changed
+- Enhanced UI consistency across status indicators using custom styled elements instead of component library dependencies
+- Improved user experience with proper cursor pointer display for all interactive elements throughout the application
 ## [1.0.0] - 2025-12-12
 
 ### Added

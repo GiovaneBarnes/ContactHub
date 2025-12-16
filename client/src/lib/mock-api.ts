@@ -31,7 +31,8 @@ let MOCK_GROUPS: Group[] = [
         enabled: true
       }
     ],
-    backgroundInfo: 'Focus on upcoming campaign launches and social media metrics.'
+    backgroundInfo: 'Focus on upcoming campaign launches and social media metrics.',
+    enabled: true
   },
   { 
     id: '2', 
@@ -52,7 +53,8 @@ let MOCK_GROUPS: Group[] = [
         enabled: true
       }
     ],
-    backgroundInfo: 'Casual tone, coordinate times for Saturday morning session.'
+    backgroundInfo: 'Casual tone, coordinate times for Saturday morning session.',
+    enabled: true
   },
   {
     id: '3',
@@ -79,7 +81,8 @@ let MOCK_GROUPS: Group[] = [
         enabled: true
       }
     ],
-    backgroundInfo: 'Warm and personal communication for family matters.'
+    backgroundInfo: 'Warm and personal communication for family matters.',
+    enabled: true
   }
 ];
 

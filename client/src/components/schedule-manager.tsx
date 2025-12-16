@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Plus, Trash2, Edit } from 'lucide-react';
 import { Schedule } from '@/lib/types';
 import { formatSchedule, getNextOccurrences } from '@/lib/schedule-utils';
+import { generateId } from '@/lib/utils';
 
 // Holiday date calculation functions
 function getThanksgivingDate(year: number): string {
@@ -303,7 +304,7 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
     tomorrow.setDate(tomorrow.getDate() + 1);
     
     return {
-      id: schedule?.id || crypto.randomUUID(),
+      id: schedule?.id || generateId(),
       type: schedule?.type || 'recurring',
       name: schedule?.name || '',
       startDate: schedule?.startDate || tomorrow.toISOString().split('T')[0],
@@ -347,7 +348,7 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
       tomorrow.setDate(tomorrow.getDate() + 1);
       
       setFormData({
-        id: crypto.randomUUID(),
+        id: generateId(),
         type: 'recurring',
         name: '',
         startDate: tomorrow.toISOString().split('T')[0],
@@ -388,7 +389,7 @@ function ScheduleDialog({ isOpen, onClose, schedule, onSave }: ScheduleDialogPro
       tomorrow.setDate(tomorrow.getDate() + 1);
       
       setFormData({
-        id: crypto.randomUUID(),
+        id: generateId(),
         type: 'recurring',
         name: '',
         startDate: tomorrow.toISOString().split('T')[0],

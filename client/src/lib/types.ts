@@ -37,6 +37,7 @@ export interface Group {
   contactIds: string[];
   schedules: Schedule[];
   backgroundInfo: string;
+  enabled: boolean;
 }
 
 export interface MessageLog {

@@ -28,9 +28,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = () => (
     <div className="flex flex-col h-full glass border-r border-border/50">
       <div className="p-6 border-b border-border/50">
-        <h1 className="text-xl font-bold font-display tracking-tight text-gradient">
-          Contact<span className="text-primary">Hub</span>
-        </h1>
+        <Link href="/">
+          <h1 className="text-xl font-bold font-display tracking-tight text-gradient hover:text-primary/80 transition-colors cursor-pointer">
+            Contact<span className="text-primary">Hub</span>
+          </h1>
+        </Link>
         <div className="mt-2 text-xs text-muted-foreground">
           Contact Management Made Simple
         </div>
@@ -88,9 +90,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 glass border-b border-border/50 z-50 flex items-center px-4 justify-between backdrop-blur-xl">
-        <h1 className="text-lg font-bold font-display text-gradient">
-          ContactHub
-        </h1>
+        <Link href="/">
+          <h1 className="text-lg font-bold font-display text-gradient hover:text-primary/80 transition-colors cursor-pointer">
+            ContactHub
+          </h1>
+        </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
