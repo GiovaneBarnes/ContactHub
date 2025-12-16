@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/mock-api";
+import { firebaseApi } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Layers, MessageSquare, History, Plus, Send, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,13 +29,13 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: contacts } = useQuery({ queryKey: ['contacts'], queryFn: api.contacts.list });
-  const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: api.groups.list });
-  const { data: logs } = useQuery({ queryKey: ['logs'], queryFn: api.logs.list });
+  const { data: contacts } = useQuery({ queryKey: ['contacts'], queryFn: firebaseApi.contacts.list });
+  const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: firebaseApi.groups.list });
+  const { data: logs } = useQuery({ queryKey: ['logs'], queryFn: firebaseApi.logs.list });
 
   const sendMessageMutation = useMutation({
     mutationFn: ({ groupId, content }: { groupId: string; content: string }) => {
-      return api.messaging.send(groupId, content, ['sms', 'email']);
+      return firebaseApi.messaging.send(groupId, content, ['sms', 'email']);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['logs'] });
@@ -49,7 +49,7 @@ export default function Dashboard() {
 
   const scheduleMessageMutation = useMutation({
     mutationFn: ({ groupId, schedule }: { groupId: string; schedule: any }) => {
-      return api.groups.createSchedule(groupId, schedule);
+      return firebaseApi.groups.createSchedule(groupId, schedule);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
