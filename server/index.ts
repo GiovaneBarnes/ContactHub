@@ -16,9 +16,13 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      scriptSrc: ["'self'"],
+      scriptSrc: process.env.NODE_ENV === 'development' 
+        ? ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.googletagmanager.com"]
+        : ["'self'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
+      connectSrc: process.env.NODE_ENV === 'development' 
+        ? ["'self'", "https://firestore.googleapis.com", "https://firebase.googleapis.com", "https://www.googleapis.com", "https://firebaseinstallations.googleapis.com", "wss://firestore.googleapis.com"]
+        : ["'self'"],
     },
   },
   hsts: {
@@ -31,7 +35,7 @@ app.use(helmet({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'development' ? 1000 : 500, // Higher limit for both dev and prod
   message: "Too many requests from this IP, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
@@ -135,7 +139,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Add logging for all requests
+app.use((req, res, next) => {
+  log(`${req.method} ${req.path}`);
+  next();
+});
+
 (async () => {
+  try {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -161,7 +172,16 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "8000", 10);
-  httpServer.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
+  httpServer.listen(port, "0.0.0.0", (err?: any) => {
+    if (err) {
+      log(`Error listening on port ${port}: ${err.message}`);
+      process.exit(1);
+    } else {
+      log(`serving on port ${port}`);
+    }
   });
+  } catch (error) {
+    console.error('Server startup error:', error);
+    process.exit(1);
+  }
 })();

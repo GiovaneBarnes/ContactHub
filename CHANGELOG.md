@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mobile Responsiveness**: Improved layout and navigation for mobile devices
 - **TypeScript Compilation**: Resolved all TypeScript errors and strict mode compliance
 - **Test Suite Issues**: Fixed all test configuration and syntax errors for clean test execution
+- **Rate Limiting Configuration**: Increased rate limits from 100 to 1000 requests per 15 minutes in development and 500 in production to prevent false positives during normal usage
+- **Content Security Policy (CSP)**: Updated CSP headers and HTML meta tags to allow Firebase API connections (Firestore, Auth, Analytics, Installations) in development mode
+- **Vite Configuration**: Fixed JSX runtime to use automatic JSX transform and updated path aliases for Node.js compatibility
+- **React Import Issues**: Fixed React import requirements in toast component for automatic JSX runtime
+- **Server Error Handling**: Added comprehensive error handling and logging for server startup and request processing
+- **Firebase Integration**: Resolved CSP violations preventing Firebase Firestore, Authentication, and Analytics from functioning properly
 
 ## [1.0.0] - 2025-12-12
 
