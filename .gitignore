@@ -16,3 +16,9 @@ attached_assets
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-cache/
+serviceAccountKey.json
