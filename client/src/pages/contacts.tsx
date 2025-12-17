@@ -50,6 +50,54 @@ const contactSchema = z.object({
   notes: z.string().optional(),
 });
 
+// Generate VCF content for a single contact
+const generateVCF = (contact: Contact): string => {
+  const vcf = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${contact.name}`,
+    `N:${contact.name};;;`,
+    `TEL;TYPE=CELL:${contact.phone}`,
+    `EMAIL;TYPE=INTERNET:${contact.email}`,
+    contact.notes ? `NOTE:${contact.notes.replace(/\n/g, '\\n')}` : null,
+    'END:VCARD'
+  ].filter(Boolean).join('\n');
+
+  return vcf;
+};
+
+// Export contacts to VCF file
+const exportContactsToVCF = (contacts: Contact[]) => {
+  if (contacts.length === 0) return;
+
+  let vcfContent: string;
+
+  if (contacts.length === 1) {
+    // Single contact - create individual VCF file
+    vcfContent = generateVCF(contacts[0]);
+  } else {
+    // Multiple contacts - combine into single VCF file
+    vcfContent = contacts.map(generateVCF).join('\n\n');
+  }
+
+  // Create and download the file
+  const blob = new Blob([vcfContent], { type: 'text/vcard' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+
+  if (contacts.length === 1) {
+    link.download = `${contacts[0].name.replace(/[^a-zA-Z0-9]/g, '_')}.vcf`;
+  } else {
+    link.download = `contacts_${new Date().toISOString().split('T')[0]}.vcf`;
+  }
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -445,6 +493,11 @@ END:VCARD`;
     }
   };
 
+  const handleExportVCF = () => {
+    const selectedContactsData = filteredContacts.filter(contact => selectedContacts.has(contact.id));
+    exportContactsToVCF(selectedContactsData);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -497,15 +550,26 @@ END:VCARD`;
         <div className="bg-card rounded-lg border p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="font-medium">{selectedContacts.size} contact{selectedContacts.size !== 1 ? 's' : ''} selected</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleBulkDelete}
-              className="gap-2"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Selected
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportVCF}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export VCF
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                className="gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Selected
+              </Button>
+            </div>
           </div>
         </div>
       )}

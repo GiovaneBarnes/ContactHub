@@ -103,7 +103,7 @@ export default function LogsPage() {
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
+            <DialogTitle className="flex items-center justify-between pr-8">
               <span>Message Details</span>
               <Badge variant={selectedLog?.status === 'sent' ? 'default' : 'destructive'}>
                 {selectedLog?.status}
