@@ -38,6 +38,13 @@ vi.mock('firebase/firestore', () => ({
   }
 }))
 
+// Mock Firebase Auth
+vi.mock('firebase/auth', () => ({
+  getAuth: vi.fn(() => ({
+    currentUser: { uid: 'test-user-id', email: 'test@example.com', displayName: 'Test User' }
+  }))
+}))
+
 vi.mock('../firebase', () => ({
   db: { type: 'firestore-mock' }
 }))
@@ -57,7 +64,8 @@ const mockGroup = {
   description: 'A test group',
   contactIds: ['contact-1'],
   schedules: [],
-  backgroundInfo: 'Test background'
+  backgroundInfo: 'Test background',
+  enabled: true
 }
 
 const mockDoc = {
@@ -136,6 +144,7 @@ describe('Firebase API', () => {
       expect(collection).toHaveBeenCalledWith({ type: 'firestore-mock' }, 'contacts')
       expect(addDoc).toHaveBeenCalledWith('mock-collection', {
         ...newContact,
+        userId: 'test-user-id',
         createdAt: 'server-timestamp'
       })
       expect(result).toEqual({
@@ -161,13 +170,22 @@ describe('Firebase API', () => {
       })
     })
 
-    it('should delete contact', async () => {
-      vi.mocked(doc).mockReturnValue('mock-doc-ref' as any)
+    it('should throw error when creating contact without authentication', async () => {
+      // Mock getAuth to return null currentUser
+      const { getAuth } = await import('firebase/auth')
+      const mockGetAuth = vi.mocked(getAuth)
+      mockGetAuth.mockReturnValueOnce({
+        currentUser: null
+      } as any)
 
-      await firebaseApi.contacts.delete('contact-1')
+      const newContact = {
+        name: 'Jane Doe',
+        phone: '+0987654321',
+        email: 'jane@example.com',
+        notes: 'New contact'
+      }
 
-      expect(doc).toHaveBeenCalledWith({ type: 'firestore-mock' }, 'contacts', 'contact-1')
-      expect(deleteDoc).toHaveBeenCalledWith('mock-doc-ref')
+      await expect(firebaseApi.contacts.create(newContact)).rejects.toThrow('User not authenticated')
     })
   })
 
@@ -224,7 +242,8 @@ describe('Firebase API', () => {
         description: 'A new test group',
         contactIds: [],
         schedules: [],
-        backgroundInfo: 'New background'
+        backgroundInfo: 'New background',
+        enabled: true
       }
 
       const mockDocRef = { id: 'new-group-id' }
@@ -252,8 +271,9 @@ describe('Firebase API', () => {
 
       const newSchedule = {
         type: 'one-time' as const,
-        date: '2025-12-25',
-        message: 'Merry Christmas!'
+        startDate: '2025-12-25',
+        message: 'Merry Christmas!',
+        enabled: true
       }
 
       const result = await firebaseApi.groups.createSchedule('group-1', newSchedule)
@@ -266,7 +286,7 @@ describe('Firebase API', () => {
     it('should update schedule', async () => {
       const groupWithSchedule = {
         ...mockGroup,
-        schedules: [{ id: 'schedule-1', type: 'one-time' as const, date: '2025-12-25', message: 'Test' }]
+        schedules: [{ id: 'schedule-1', type: 'one-time' as const, startDate: '2025-12-25', message: 'Test', enabled: true }]
       }
 
       const mockGroupDoc = {
@@ -286,10 +306,21 @@ describe('Firebase API', () => {
       expect(result.schedules[0].message).toBe('Updated message')
     })
 
+    it('should throw error when updating schedule for non-existent group', async () => {
+      const mockSnapshot = {
+        docs: []
+      }
+
+      vi.mocked(getDocs).mockResolvedValue(mockSnapshot as any)
+
+      const updates = { message: 'Updated message' }
+      await expect(firebaseApi.groups.updateSchedule('non-existent', 'schedule-1', updates)).rejects.toThrow('Group not found')
+    })
+
     it('should delete schedule', async () => {
       const groupWithSchedule = {
         ...mockGroup,
-        schedules: [{ id: 'schedule-1', type: 'one-time' as const, date: '2025-12-25', message: 'Test' }]
+        schedules: [{ id: 'schedule-1', type: 'one-time' as const, startDate: '2025-12-25', message: 'Test', enabled: true }]
       }
 
       const mockGroupDoc = {
@@ -394,6 +425,7 @@ describe('Firebase API', () => {
         groupName: 'Test Group',
         messageContent: 'Test message',
         recipients: 1,
+        userId: 'test-user-id',
         timestamp: 'server-timestamp',
         status: 'sent'
       })

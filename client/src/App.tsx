@@ -36,10 +36,14 @@ function Router() {
     <Switch>
       <Route path="/auth" component={AuthPage} />
       
-      {/* Protected Routes */}
+      {/* Dashboard is now public for development */}
       <Route path="/">
-        <ProtectedRoute component={Dashboard} />
+        <Layout>
+          <Dashboard />
+        </Layout>
       </Route>
+      
+      {/* Other routes still protected */}
       <Route path="/contacts">
         <ProtectedRoute component={ContactsPage} />
       </Route>

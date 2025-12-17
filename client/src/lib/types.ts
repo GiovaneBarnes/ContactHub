@@ -16,6 +16,7 @@ export interface Schedule {
   id: string;
   type: 'one-time' | 'recurring';
   name?: string; // For holidays/special days
+  message?: string; // Message content to send
   startDate: string; // ISO date string
   startTime?: string; // HH:MM format (24-hour)
   endDate?: string; // For recurring schedules with end date

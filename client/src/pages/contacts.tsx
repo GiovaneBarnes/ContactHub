@@ -110,7 +110,7 @@ export default function ContactsPage() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (contactIds: string[]) => {
-      await Promise.all(contactIds.map(id => api.contacts.delete(id)));
+      await Promise.all(contactIds.map(id => firebaseApi.contacts.delete(id)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
@@ -126,7 +126,7 @@ export default function ContactsPage() {
       for (let i = 0; i < contacts.length; i++) {
         const contact = contacts[i];
         try {
-          await api.contacts.create(contact);
+          await firebaseApi.contacts.create(contact);
           results.push({ success: true, contact });
           setImportProgress((i + 1) / contacts.length * 100);
         } catch (error) {

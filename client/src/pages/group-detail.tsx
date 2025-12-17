@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/mock-api";
+import { firebaseApi } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ export default function GroupDetailPage() {
 
   const { data: group, isLoading } = useQuery({
     queryKey: ['group', id],
-    queryFn: () => api.groups.get(id!),
+    queryFn: () => firebaseApi.groups.get(id!),
     enabled: !!id
   });
 
@@ -41,7 +41,7 @@ export default function GroupDetailPage() {
 
   const { data: allContacts } = useQuery({
     queryKey: ['contacts'],
-    queryFn: api.contacts.list
+    queryFn: firebaseApi.contacts.list
   });
 
   const filteredContacts = allContacts?.filter(c => 
@@ -52,7 +52,7 @@ export default function GroupDetailPage() {
   );
 
   const updateGroupMutation = useMutation({
-    mutationFn: (data: any) => api.groups.update(id!, data),
+    mutationFn: (data: any) => firebaseApi.groups.update(id!, data),
     onSuccess: (updatedGroup) => {
       // Update the individual group cache
       queryClient.setQueryData(['group', id], updatedGroup);
@@ -66,7 +66,7 @@ export default function GroupDetailPage() {
   });
 
   const generateAiMutation = useMutation({
-    mutationFn: () => api.ai.generateMessage(id!),
+    mutationFn: () => firebaseApi.ai.generateMessage(id!),
     onSuccess: (message) => {
       setGeneratedMessage(message);
       toast({ title: "Message generated", description: "You can edit it before sending." });
@@ -74,7 +74,7 @@ export default function GroupDetailPage() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: () => api.messaging.send(id!, generatedMessage, ['sms', 'email']),
+    mutationFn: () => firebaseApi.messaging.send(id!, generatedMessage, ['sms', 'email']),
     onSuccess: () => {
       setGeneratedMessage("");
       toast({ title: "Message sent!", description: "Check logs for delivery status." });

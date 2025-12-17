@@ -59,24 +59,40 @@ export function Layout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
       <div className="p-4 border-t border-border/50">
-        <div className="flex items-center gap-3 px-3 py-2 mb-4 rounded-lg bg-muted/30 border border-border/30">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground font-bold text-sm">
-            {user?.name?.[0] || "U"}
+        {user ? (
+          <>
+            <div className="flex items-center gap-3 px-3 py-2 mb-4 rounded-lg bg-muted/30 border border-border/30">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground font-bold text-sm">
+                {user.name?.[0] || "U"}
+              </div>
+              <div className="text-sm flex-1 min-w-0">
+                <p className="truncate font-medium">{user.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+              <ThemeToggle />
+            </div>
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 h-10 hover-glow"
+              onClick={logout}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <ThemeToggle />
+            <div className="text-center text-sm text-muted-foreground">
+              <Link href="/auth?mode=login">
+                <Button variant="outline" className="w-full justify-start gap-3 h-10 hover-glow">
+                  <LogOut className="h-4 w-4 rotate-180" />
+                  Sign In
+                </Button>
+              </Link>
+            </div>
           </div>
-          <div className="text-sm flex-1 min-w-0">
-            <p className="truncate font-medium">{user?.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-          </div>
-          <ThemeToggle />
-        </div>
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-3 h-10 hover-glow"
-          onClick={logout}
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Button>
+        )}
       </div>
     </div>
   );

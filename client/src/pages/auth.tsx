@@ -21,9 +21,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users, MessageSquare, Clock } from "lucide-react";
 import { validateEmail, sanitizeInput, rateLimiter, SECURITY_CONFIG } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -38,6 +40,11 @@ export default function AuthPage() {
   const { login, signup } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [location] = useLocation();
+  
+  // Get mode from query parameters
+  const urlParams = new URLSearchParams(location.split('?')[1]);
+  const defaultTab = urlParams.get('mode') === 'signup' ? 'signup' : 'login';
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -107,20 +114,100 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50/50 p-4">
-      <Card className="w-full max-w-md shadow-lg border-primary/10">
-        <CardHeader className="text-center space-y-2">
-          <CardTitle className="text-3xl font-display font-bold text-primary">ContactApp</CardTitle>
-          <CardDescription>
-            Manage your contacts and automate your messaging
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 dark:from-background dark:via-background dark:to-muted/10 flex items-center justify-center p-4 relative">
+
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/5 dark:to-primary/2 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-chart-2/10 to-chart-2/5 dark:from-chart-2/5 dark:to-chart-2/2 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-4xl grid md:grid-cols-2 gap-8 items-center">
+        {/* Left side - Features */}
+        <div className="hidden md:block space-y-8">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-display font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                ContactHub
+              </h1>
+              <p className="text-xl text-gray-600">
+                Smart contact management, automated messaging
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-4 p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/20 shadow-sm dark:bg-card/60 dark:border-border/10">
+                <div className="p-2 rounded-lg bg-primary/10 dark:bg-primary/5">
+                  <Users className="h-5 w-5 text-primary dark:text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-card-foreground dark:text-card-foreground">Organize Contacts</h3>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">Create groups, manage contacts, and keep everything organized</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/20 shadow-sm dark:bg-card/60 dark:border-border/10">
+                <div className="p-2 rounded-lg bg-chart-1/10 dark:bg-chart-1/5">
+                  <MessageSquare className="h-5 w-5 text-chart-1 dark:text-chart-1" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-card-foreground dark:text-card-foreground">Automated Messaging</h3>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">Schedule messages, send to groups, and automate your communication</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/20 shadow-sm dark:bg-card/60 dark:border-border/10">
+                <div className="p-2 rounded-lg bg-chart-2/10 dark:bg-chart-2/5">
+                  <Clock className="h-5 w-5 text-chart-2 dark:text-chart-2" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-card-foreground dark:text-card-foreground">Smart Scheduling</h3>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">Set up recurring messages and never miss important communications</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gradient-to-r from-primary/10 to-chart-1/10 border border-primary/20 dark:from-primary/5 dark:to-chart-1/5 dark:border-primary/10">
+              <p className="text-sm text-card-foreground dark:text-card-foreground">
+                <span className="font-semibold">✨ Free to start:</span> No credit card required. Upgrade anytime for advanced features.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right side - Auth Form */}
+        <div className="w-full max-w-md mx-auto">
+          <Card className="shadow-2xl border-0 bg-card/80 backdrop-blur-sm dark:bg-card/80 dark:backdrop-blur-sm">
+            <CardHeader className="text-center space-y-2 pb-2">
+              <div className="mx-auto w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mb-4">
+                <MessageSquare className="h-6 w-6 text-white" />
+              </div>
+              <CardTitle className="text-2xl font-display font-bold text-card-foreground dark:text-card-foreground">
+                {defaultTab === 'signup' ? 'Join ContactHub' : 'Welcome Back'}
+              </CardTitle>
+              <CardDescription className="text-muted-foreground dark:text-muted-foreground">
+                {defaultTab === 'signup'
+                  ? 'Create your account and start managing contacts smarter'
+                  : 'Sign in to your account to continue'
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <Tabs defaultValue={defaultTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted dark:bg-muted">
+                  <TabsTrigger
+                    value="login"
+                    className="data-[state=active]:bg-background data-[state=active]:shadow-sm dark:data-[state=active]:bg-background dark:data-[state=active]:text-card-foreground"
+                  >
+                    Sign In
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="signup"
+                    className="data-[state=active]:bg-background data-[state=active]:shadow-sm dark:data-[state=active]:bg-background dark:data-[state=active]:text-card-foreground"
+                  >
+                    Sign Up
+                  </TabsTrigger>
+                </TabsList>
 
             <TabsContent value="login">
               <Form {...loginForm}>
@@ -151,7 +238,11 @@ export default function AuthPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                    disabled={isLoading}
+                  >
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Sign In
                   </Button>
@@ -204,7 +295,11 @@ export default function AuthPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                    disabled={isLoading}
+                  >
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Create Account
                   </Button>
@@ -214,6 +309,8 @@ export default function AuthPage() {
           </Tabs>
         </CardContent>
       </Card>
+      </div>
+      </div>
     </div>
   );
 }

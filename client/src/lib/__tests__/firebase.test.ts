@@ -33,10 +33,35 @@ describe('Firebase Configuration', () => {
     vi.stubEnv('VITE_FIREBASE_MEASUREMENT_ID', 'G-TEST123')
   })
 
-  it('should not initialize Analytics in server environment', async () => {
-    // Note: This test is challenging due to module caching in test environment
-    // The actual implementation correctly checks for window before initializing analytics
-    expect(true).toBe(true) // Placeholder test - functionality verified in integration
+  it('should not initialize Analytics when window is undefined (server-side)', async () => {
+    // Mock window as undefined (server environment)
+    const originalWindow = global.window
+    ;(global as any).window = undefined
+
+    // Re-import to test the branch
+    vi.resetModules()
+    const firebaseModule = await import('../firebase')
+
+    expect(firebaseModule.analytics).toBeNull()
+
+    // Restore window
+    ;(global as any).window = originalWindow
+  })
+
+  it('should initialize Analytics when window is defined (client-side)', async () => {
+    // Ensure window is defined (client environment)
+    const originalWindow = global.window
+    ;(global as any).window = {}
+
+    // Re-import to test the branch
+    vi.resetModules()
+    const firebaseModule = await import('../firebase')
+
+    expect(firebaseModule.analytics).not.toBeNull()
+    expect(getAnalytics).toHaveBeenCalled()
+
+    // Restore window
+    ;(global as any).window = originalWindow
   })
 
   it('should initialize Firebase app with correct config', async () => {

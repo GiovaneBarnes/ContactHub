@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   Timestamp
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { db } from "./firebase";
 import { Contact, Group, MessageLog, User } from "./types";
 
@@ -17,6 +18,16 @@ import { Contact, Group, MessageLog, User } from "./types";
 const CONTACTS_COLLECTION = "contacts";
 const GROUPS_COLLECTION = "groups";
 const LOGS_COLLECTION = "messageLogs";
+
+// Helper to get current user ID
+const getCurrentUserId = (): string => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("User not authenticated");
+  }
+  return user.uid;
+};
 
 // Helper to convert Firestore doc to Contact
 const docToContact = (doc: any): Contact => {
@@ -39,7 +50,8 @@ const docToGroup = (doc: any): Group => {
     description: data.description,
     contactIds: data.contactIds || [],
     schedules: data.schedules || [],
-    backgroundInfo: data.backgroundInfo || ""
+    backgroundInfo: data.backgroundInfo || "",
+    enabled: data.enabled !== false // Default to true if not specified
   };
 };
 
@@ -53,7 +65,9 @@ const docToMessageLog = (doc: any): MessageLog => {
     messageContent: data.messageContent,
     recipients: data.recipients,
     timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate().toISOString() : data.timestamp,
-    status: data.status
+    status: data.status,
+    deliveryMethod: data.deliveryMethod || 'sms',
+    recipientDetails: data.recipientDetails || []
   };
 };
 
@@ -80,9 +94,11 @@ export const firebaseApi = {
     },
 
     create: async (data: Omit<Contact, 'id'>): Promise<Contact> => {
+      const userId = getCurrentUserId();
       const contactsRef = collection(db, CONTACTS_COLLECTION);
       const docRef = await addDoc(contactsRef, {
         ...data,
+        userId,
         createdAt: serverTimestamp()
       });
       return {
@@ -122,9 +138,11 @@ export const firebaseApi = {
     },
 
     create: async (data: Omit<Group, 'id'>): Promise<Group> => {
+      const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
       const docRef = await addDoc(groupsRef, {
         ...data,
+        userId,
         createdAt: serverTimestamp()
       });
       return {
@@ -245,6 +263,7 @@ export const firebaseApi = {
     send: async (groupId: string, content: string, channels: ('sms' | 'email')[]): Promise<void> => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
       const snapshot = await getDocs(groupsRef);
       const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
@@ -259,6 +278,7 @@ export const firebaseApi = {
         groupName: group.name,
         messageContent: content,
         recipients: group.contactIds.length,
+        userId,
         timestamp: serverTimestamp(),
         status: 'sent'
       });

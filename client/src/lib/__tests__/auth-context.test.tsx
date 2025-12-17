@@ -2,17 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from '../auth-context'
-import { api } from '../mock-api'
 
-// Mock the API
-vi.mock('../mock-api', () => ({
-  api: {
-    auth: {
-      getCurrentUser: vi.fn(),
-      login: vi.fn(),
-      signup: vi.fn()
-    }
-  }
+// Mock Firebase Auth
+vi.mock('firebase/auth', () => ({
+  getAuth: vi.fn(() => ({ currentUser: null })),
+  onAuthStateChanged: vi.fn(),
+  signInWithEmailAndPassword: vi.fn(),
+  createUserWithEmailAndPassword: vi.fn(),
+  signOut: vi.fn(),
+  updateProfile: vi.fn(),
+}))
+
+vi.mock('../firebase', () => ({
+  auth: {}
 }))
 
 // Mock wouter
@@ -30,12 +32,28 @@ vi.mock('@/hooks/use-toast', () => ({
 const TestComponent = () => {
   const { user, login, signup, logout, isLoading } = useAuth()
 
+  const handleLogin = async () => {
+    try {
+      await login('test@example.com', 'password')
+    } catch (e) {
+      // Error is handled by the auth context
+    }
+  }
+
+  const handleSignup = async () => {
+    try {
+      await signup('test@example.com', 'password', 'Test User')
+    } catch (e) {
+      // Error is handled by the auth context
+    }
+  }
+
   return (
     <div>
       <div data-testid="loading">{isLoading ? 'loading' : 'loaded'}</div>
       <div data-testid="user">{user ? user.name : 'no-user'}</div>
-      <button onClick={() => login('test@example.com', 'password')}>Login</button>
-      <button onClick={() => signup('test@example.com', 'password', 'Test User')}>Signup</button>
+      <button onClick={handleLogin}>Login</button>
+      <button onClick={handleSignup}>Signup</button>
       <button onClick={logout}>Logout</button>
     </div>
   )
@@ -46,9 +64,13 @@ describe('AuthProvider', () => {
     vi.clearAllMocks()
   })
 
-  it('should show loading initially', () => {
-    const mockApi = vi.mocked(api.auth)
-    mockApi.getCurrentUser.mockImplementation(() => new Promise(() => {})) // Never resolves
+  it('should show loading initially', async () => {
+    const { onAuthStateChanged } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      // Don't call callback to keep loading state
+      return vi.fn()
+    })
 
     render(
       <AuthProvider>
@@ -60,9 +82,19 @@ describe('AuthProvider', () => {
   })
 
   it('should load user on mount if authenticated', async () => {
-    const mockUser = { id: '1', name: 'Test User', email: 'test@example.com' }
-    const mockApi = vi.mocked(api.auth)
-    mockApi.getCurrentUser.mockResolvedValue(mockUser)
+    const { onAuthStateChanged } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockFirebaseUser = {
+      uid: '1',
+      email: 'test@example.com',
+      displayName: 'Test User'
+    }
+
+    // Mock onAuthStateChanged to call the callback with user
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(mockFirebaseUser)
+      return vi.fn()
+    })
 
     render(
       <AuthProvider>
@@ -78,10 +110,18 @@ describe('AuthProvider', () => {
   })
 
   it('should handle login successfully', async () => {
-    const mockUser = { id: '1', name: 'Test User', email: 'test@example.com' }
-    const mockApi = vi.mocked(api.auth)
-    mockApi.getCurrentUser.mockResolvedValue(null)
-    mockApi.login.mockResolvedValue(mockUser)
+    const { onAuthStateChanged, signInWithEmailAndPassword } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockSignInWithEmailAndPassword = vi.mocked(signInWithEmailAndPassword)
+
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(null) // Initially no user
+      return vi.fn()
+    })
+
+    mockSignInWithEmailAndPassword.mockResolvedValue({
+      user: { uid: '1', email: 'test@example.com', displayName: 'Test User' }
+    } as any)
 
     const user = userEvent.setup()
 
@@ -98,14 +138,23 @@ describe('AuthProvider', () => {
     await user.click(screen.getByText('Login'))
 
     await waitFor(() => {
-      expect(mockApi.login).toHaveBeenCalledWith('test@example.com', 'password')
+      expect(mockSignInWithEmailAndPassword).toHaveBeenCalledWith({}, 'test@example.com', 'password')
     })
   })
 
   it('should validate auth context initialization', async () => {
-    const mockApi = vi.mocked(api.auth)
-    const mockUser = { id: '1', name: 'Test User', email: 'test@example.com' }
-    mockApi.getCurrentUser.mockResolvedValue(mockUser)
+    const { onAuthStateChanged } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockFirebaseUser = {
+      uid: '1',
+      email: 'test@example.com',
+      displayName: 'Test User'
+    }
+
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(mockFirebaseUser)
+      return vi.fn()
+    })
 
     render(
       <AuthProvider>
@@ -119,10 +168,22 @@ describe('AuthProvider', () => {
   })
 
   it('should handle signup successfully', async () => {
-    const mockUser = { id: '1', name: 'Test User', email: 'test@example.com' }
-    const mockApi = vi.mocked(api.auth)
-    mockApi.getCurrentUser.mockResolvedValue(null)
-    mockApi.signup.mockResolvedValue(mockUser)
+    const { onAuthStateChanged, createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockCreateUserWithEmailAndPassword = vi.mocked(createUserWithEmailAndPassword)
+    const mockUpdateProfile = vi.mocked(updateProfile)
+
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(null) // Initially no user
+      return vi.fn()
+    })
+
+    const mockFirebaseUser = { uid: '1', email: 'test@example.com', displayName: null }
+    mockCreateUserWithEmailAndPassword.mockResolvedValue({
+      user: mockFirebaseUser
+    } as any)
+
+    mockUpdateProfile.mockResolvedValue()
 
     const user = userEvent.setup()
 
@@ -139,14 +200,23 @@ describe('AuthProvider', () => {
     await user.click(screen.getByText('Signup'))
 
     await waitFor(() => {
-      expect(mockApi.signup).toHaveBeenCalledWith('test@example.com', 'password', 'Test User')
+      expect(mockCreateUserWithEmailAndPassword).toHaveBeenCalledWith({}, 'test@example.com', 'password')
+      expect(mockUpdateProfile).toHaveBeenCalledWith(mockFirebaseUser, { displayName: 'Test User' })
     })
   })
 
-  it('should handle logout', async () => {
-    const mockUser = { id: '1', name: 'Test User', email: 'test@example.com' }
-    const mockApi = vi.mocked(api.auth)
-    mockApi.getCurrentUser.mockResolvedValue(mockUser)
+  it('should handle login failure', async () => {
+    const { onAuthStateChanged, signInWithEmailAndPassword } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockSignInWithEmailAndPassword = vi.mocked(signInWithEmailAndPassword)
+
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(null)
+      return vi.fn()
+    })
+
+    const error = new Error('Invalid credentials')
+    mockSignInWithEmailAndPassword.mockRejectedValue(error)
 
     const user = userEvent.setup()
 
@@ -157,12 +227,125 @@ describe('AuthProvider', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('user')).toHaveTextContent('Test User')
+      expect(screen.getByTestId('loading')).toHaveTextContent('loaded')
+    })
+
+    await user.click(screen.getByText('Login'))
+
+    // Error should be caught and handled by the auth context
+    await waitFor(() => {
+      expect(mockSignInWithEmailAndPassword).toHaveBeenCalledWith({}, 'test@example.com', 'password')
+    })
+    // The error is caught internally, so we don't expect it to be re-thrown
+  })
+
+  it('should handle signup failure', async () => {
+    const { onAuthStateChanged, createUserWithEmailAndPassword } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockCreateUserWithEmailAndPassword = vi.mocked(createUserWithEmailAndPassword)
+
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(null)
+      return vi.fn()
+    })
+
+    const error = new Error('Email already in use')
+    mockCreateUserWithEmailAndPassword.mockRejectedValue(error)
+
+    const user = userEvent.setup()
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('loaded')
+    })
+
+    await user.click(screen.getByText('Signup'))
+
+    // Error should be caught and handled by the auth context
+    await waitFor(() => {
+      expect(mockCreateUserWithEmailAndPassword).toHaveBeenCalledWith({}, 'test@example.com', 'password')
+    })
+    // The error is caught internally, so we don't expect it to be re-thrown
+  })
+
+  it('should handle logout failure', async () => {
+    const { onAuthStateChanged, signOut } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockSignOut = vi.mocked(signOut)
+    const mockFirebaseUser = {
+      uid: '1',
+      email: 'test@example.com',
+      displayName: 'Test User'
+    }
+
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(mockFirebaseUser)
+      return vi.fn()
+    })
+
+    const error = new Error('Network error')
+    mockSignOut.mockRejectedValue(error)
+
+    const user = userEvent.setup()
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('loaded')
     })
 
     await user.click(screen.getByText('Logout'))
 
-    expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    await waitFor(() => {
+      expect(mockSignOut).toHaveBeenCalled()
+    })
+  })
+
+  it('should handle logout success', async () => {
+    const { onAuthStateChanged, signOut } = await import('firebase/auth')
+    const mockOnAuthStateChanged = vi.mocked(onAuthStateChanged)
+    const mockSignOut = vi.mocked(signOut)
+    const mockFirebaseUser = {
+      uid: '1',
+      email: 'test@example.com',
+      displayName: 'Test User'
+    }
+
+    mockOnAuthStateChanged.mockImplementation((auth: any, callback: any) => {
+      callback(mockFirebaseUser)
+      return vi.fn()
+    })
+
+    mockSignOut.mockResolvedValue()
+
+    const user = userEvent.setup()
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('loaded')
+    })
+
+    expect(screen.getByTestId('user')).toHaveTextContent('Test User')
+
+    await user.click(screen.getByText('Logout'))
+
+    await waitFor(() => {
+      expect(mockSignOut).toHaveBeenCalled()
+    })
   })
 
   it('should provide default context when used outside provider', () => {

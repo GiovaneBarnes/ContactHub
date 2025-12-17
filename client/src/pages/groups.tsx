@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/mock-api";
+import { firebaseApi } from "@/lib/firebase-api";
 import { Group } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,11 +70,11 @@ export default function GroupsPage() {
 
   const { data: groups, isLoading } = useQuery({ 
     queryKey: ['groups'], 
-    queryFn: api.groups.list 
+    queryFn: firebaseApi.groups.list 
   });
 
   const createMutation = useMutation({
-    mutationFn: api.groups.create,
+    mutationFn: firebaseApi.groups.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
       setIsOpen(false);
@@ -83,7 +83,7 @@ export default function GroupsPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: api.groups.delete,
+    mutationFn: firebaseApi.groups.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
       setDeleteGroupId(null);
@@ -93,7 +93,7 @@ export default function GroupsPage() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (groupIds: string[]) => {
-      await Promise.all(groupIds.map(id => api.groups.delete(id)));
+      await Promise.all(groupIds.map(id => firebaseApi.groups.delete(id)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
@@ -105,7 +105,7 @@ export default function GroupsPage() {
 
   const bulkToggleEnabledMutation = useMutation({
     mutationFn: async ({ groupIds, enabled }: { groupIds: string[], enabled: boolean }) => {
-      await Promise.all(groupIds.map(id => api.groups.update(id, { enabled })));
+      await Promise.all(groupIds.map(id => firebaseApi.groups.update(id, { enabled })));
     },
     onSuccess: (_, { enabled }) => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });

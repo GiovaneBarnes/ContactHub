@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/mock-api";
+import { firebaseApi } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -27,7 +27,7 @@ export default function LogsPage() {
   const [selectedLog, setSelectedLog] = useState<MessageLog | null>(null);
   const { data: logs, isLoading } = useQuery({ 
     queryKey: ['logs'], 
-    queryFn: api.logs.list 
+    queryFn: firebaseApi.logs.list 
   });
 
   return (

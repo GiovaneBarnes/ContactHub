@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/mock-api';
+import { firebaseApi } from '@/lib/firebase-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Edit, Trash2, MessageSquare } from 'lucide-react';
@@ -34,12 +34,12 @@ export function UpcomingSchedules() {
 
   const { data: groups } = useQuery({
     queryKey: ['groups'],
-    queryFn: api.groups.list
+    queryFn: firebaseApi.groups.list
   });
 
   const updateScheduleMutation = useMutation({
     mutationFn: ({ groupId, scheduleId, updates }: { groupId: string; scheduleId: string; updates: Partial<Schedule> }) => {
-      return api.groups.updateSchedule(groupId, scheduleId, updates);
+      return firebaseApi.groups.updateSchedule(groupId, scheduleId, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
@@ -54,7 +54,7 @@ export function UpcomingSchedules() {
 
   const deleteScheduleMutation = useMutation({
     mutationFn: ({ groupId, scheduleId }: { groupId: string; scheduleId: string }) => {
-      return api.groups.deleteSchedule(groupId, scheduleId);
+      return firebaseApi.groups.deleteSchedule(groupId, scheduleId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
@@ -74,7 +74,7 @@ export function UpcomingSchedules() {
       const group = groups?.find(g => g.schedules.some(s => s.id === schedule.id));
       if (group) {
       setSelectedOccurrence({ occurrence, schedule: { ...schedule, groupId: group.id }, groupName });
-      setEditedMessage(''); // We'll generate this when the modal opens
+      setEditedMessage(schedule.message || ''); // Initialize with existing message content
       setEditedDate(occurrence.date.toISOString().split('T')[0]);
       setEditedTime(occurrence.date.toTimeString().slice(0, 5)); // HH:MM format
       setIsEditModalOpen(true);
@@ -95,6 +95,11 @@ export function UpcomingSchedules() {
     // If time changed, update the schedule
     if (editedTime !== selectedOccurrence.occurrence.date.toTimeString().slice(0, 5)) {
       updates.startTime = editedTime;
+    }
+
+    // If message changed, update the schedule
+    if (editedMessage !== (selectedOccurrence.schedule.message || '')) {
+      updates.message = editedMessage;
     }
 
     if (Object.keys(updates).length > 0) {

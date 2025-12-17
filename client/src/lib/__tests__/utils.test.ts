@@ -145,4 +145,34 @@ describe('SECURITY_CONFIG', () => {
     expect(SECURITY_CONFIG.ALLOWED_DOMAINS).toContain('localhost')
     expect(SECURITY_CONFIG.ALLOWED_DOMAINS).toContain('127.0.0.1')
   })
+
+  describe('generateId', () => {
+    it('should generate UUID using crypto.randomUUID when available', () => {
+      const mockUUID = '12345678-1234-1234-1234-123456789abc'
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(mockUUID)
+
+      const result = generateId()
+      expect(result).toBe(mockUUID)
+
+      vi.restoreAllMocks()
+    })
+
+    it('should fallback to manual UUID generation when crypto.randomUUID is not available', () => {
+      // Mock crypto.randomUUID to be undefined
+      const originalRandomUUID = crypto.randomUUID
+      ;(crypto as any).randomUUID = undefined
+
+      // Mock Math.random for predictable results
+      vi.spyOn(Math, 'random').mockReturnValue(0.5)
+
+      const result = generateId()
+
+      // Should generate a UUID-like string
+      expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+
+      // Restore
+      ;(crypto as any).randomUUID = originalRandomUUID
+      vi.restoreAllMocks()
+    })
+  })
 })

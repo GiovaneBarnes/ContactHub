@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { firebaseApi } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, MessageSquare, History, Plus, Send, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Users, Layers, MessageSquare, History, Plus, Send, Clock, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { UpcomingSchedules } from "@/components/upcoming-schedules";
@@ -18,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Dashboard() {
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
@@ -28,10 +30,23 @@ export default function Dashboard() {
   const [sendImmediately, setSendImmediately] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, isLoading: authLoading } = useAuth();
 
-  const { data: contacts } = useQuery({ queryKey: ['contacts'], queryFn: firebaseApi.contacts.list });
-  const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: firebaseApi.groups.list });
-  const { data: logs } = useQuery({ queryKey: ['logs'], queryFn: firebaseApi.logs.list });
+  const { data: contacts } = useQuery({ 
+    queryKey: ['contacts'], 
+    queryFn: firebaseApi.contacts.list,
+    enabled: !!user // Only fetch if user is authenticated
+  });
+  const { data: groups } = useQuery({ 
+    queryKey: ['groups'], 
+    queryFn: firebaseApi.groups.list,
+    enabled: !!user // Only fetch if user is authenticated
+  });
+  const { data: logs } = useQuery({ 
+    queryKey: ['logs'], 
+    queryFn: firebaseApi.logs.list,
+    enabled: !!user // Only fetch if user is authenticated
+  });
 
   const sendMessageMutation = useMutation({
     mutationFn: ({ groupId, content }: { groupId: string; content: string }) => {
@@ -62,6 +77,14 @@ export default function Dashboard() {
   });
 
   const handleOpenDraftModal = () => {
+    if (!user) {
+      toast({ 
+        title: "Authentication Required", 
+        description: "Please sign up or log in to send messages",
+        variant: "destructive" 
+      });
+      return;
+    }
     setIsDraftModalOpen(true);
   };
 
@@ -75,6 +98,15 @@ export default function Dashboard() {
   };
 
   const handleSendMessage = () => {
+    if (!user) {
+      toast({ 
+        title: "Authentication Required", 
+        description: "Please sign up or log in to send messages",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (!selectedGroupId || !messageContent.trim()) {
       toast({ title: "Please select a group and enter a message", variant: "destructive" });
       return;
@@ -93,6 +125,7 @@ export default function Dashboard() {
         id: Math.random().toString(36).substr(2, 9),
         type: 'one-time' as const,
         name: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
+        message: messageContent,
         startDate: scheduleDateTime.toISOString().split('T')[0],
         startTime: scheduledTime,
         enabled: true
@@ -102,7 +135,19 @@ export default function Dashboard() {
     }
   };
 
-  const stats = [
+  const handleAuthRequiredAction = (action: string) => {
+    if (!user) {
+      toast({ 
+        title: "Authentication Required", 
+        description: `Please sign up or log in to ${action}`,
+        variant: "destructive" 
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const stats = user ? [
     {
       label: "Total Contacts",
       value: contacts?.length || 0,
@@ -127,19 +172,88 @@ export default function Dashboard() {
       bg: "bg-gradient-to-br from-emerald-500/20 to-emerald-600/20",
       border: "border-emerald-500/30"
     },
+  ] : [
+    {
+      label: "Total Contacts",
+      value: 247,
+      icon: Users,
+      color: "text-blue-400",
+      bg: "bg-gradient-to-br from-blue-500/20 to-blue-600/20",
+      border: "border-blue-500/30"
+    },
+    {
+      label: "Enabled Groups",
+      value: 12,
+      icon: Layers,
+      color: "text-purple-400",
+      bg: "bg-gradient-to-br from-purple-500/20 to-purple-600/20",
+      border: "border-purple-500/30"
+    },
+    {
+      label: "Messages Sent",
+      value: 1847,
+      icon: MessageSquare,
+      color: "text-emerald-400",
+      bg: "bg-gradient-to-br from-emerald-500/20 to-emerald-600/20",
+      border: "border-emerald-500/30"
+    },
   ];
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Demo Banner */}
+      {!user && !authLoading && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 border border-blue-200/50 backdrop-blur-sm">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 animate-pulse" />
+          <div className="relative p-6 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 text-blue-700 text-sm font-medium mb-3">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              Live Preview
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Welcome to ContactHub
+            </h3>
+            <p className="text-gray-600 mb-4 max-w-md mx-auto">
+              Experience the power of automated contact management. This is a live preview of our platform - 
+              sign up to unlock the full potential and start managing your contacts today.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Link href="/auth?mode=signup">
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Get Started Free
+                </Button>
+              </Link>
+              <Link href="/auth?mode=login">
+                <Button variant="outline" className="border-gray-300 hover:bg-gray-50">
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign In
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-chart-2/10 rounded-2xl blur-3xl -z-10" />
         <div className="relative">
-          <h2 className="text-4xl font-display font-bold tracking-tight text-gradient mb-2">
-            Dashboard
-          </h2>
-          <p className="text-muted-foreground text-lg">
-            Welcome back to your contact command center.
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-4xl font-display font-bold tracking-tight text-gradient mb-2">
+                {user ? 'Dashboard' : 'ContactHub Preview'}
+              </h2>
+              <p className="text-muted-foreground text-lg">
+                {user ? `Welcome back, ${user.name}!` : "See what automated contact management can do for you"}
+              </p>
+            </div>
+            {user && (
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground">Welcome back!</div>
+                <div className="font-medium text-foreground">{user.name}</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -175,25 +289,78 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {logs?.slice(0, 5).map((log, index) => (
-                <div key={log.id} className="flex items-center interactive-card p-3 rounded-lg animate-fade-in" style={{ animationDelay: `${400 + index * 50}ms` }}>
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center text-primary hover-scale">
-                    <History className="h-4 w-4" />
+              {user ? (
+                logs?.slice(0, 5).map((log, index) => (
+                  <div key={log.id} className="flex items-center interactive-card p-3 rounded-lg animate-fade-in" style={{ animationDelay: `${400 + index * 50}ms` }}>
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center text-primary hover-scale">
+                      <History className="h-4 w-4" />
+                    </div>
+                    <div className="ml-4 space-y-1 flex-1">
+                      <p className="text-sm font-medium leading-none hover:text-primary transition-colors cursor-pointer">
+                        Sent message to <span className="font-semibold text-primary">{log.groupName}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(log.timestamp).toLocaleDateString()} at {new Date(log.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                    <div className="ml-auto font-medium text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full border border-border/30">
+                      {log.recipients} recipients
+                    </div>
                   </div>
-                  <div className="ml-4 space-y-1 flex-1">
-                    <p className="text-sm font-medium leading-none hover:text-primary transition-colors cursor-pointer">
-                      Sent message to <span className="font-semibold text-primary">{log.groupName}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(log.timestamp).toLocaleDateString()} at {new Date(log.timestamp).toLocaleTimeString()}
-                    </p>
+                ))
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center interactive-card p-3 rounded-lg animate-fade-in opacity-75 hover:opacity-100 transition-opacity">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/30 flex items-center justify-center">
+                      <MessageSquare className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="ml-4 space-y-1 flex-1">
+                      <p className="text-sm font-medium leading-none">
+                        Welcome message sent to <span className="font-semibold text-emerald-600">New Team Members</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Just now • Automated onboarding sequence
+                      </p>
+                    </div>
+                    <div className="ml-auto font-medium text-xs text-muted-foreground bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
+                      3 recipients
+                    </div>
                   </div>
-                  <div className="ml-auto font-medium text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full border border-border/30">
-                    {log.recipients} recipients
+                  <div className="flex items-center interactive-card p-3 rounded-lg animate-fade-in opacity-75 hover:opacity-100 transition-opacity" style={{ animationDelay: '50ms' }}>
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="ml-4 space-y-1 flex-1">
+                      <p className="text-sm font-medium leading-none">
+                        Monthly newsletter scheduled for <span className="font-semibold text-blue-600">VIP Customers</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Tomorrow at 9:00 AM • Recurring campaign
+                      </p>
+                    </div>
+                    <div className="ml-auto font-medium text-xs text-muted-foreground bg-blue-50 px-2 py-1 rounded-full border border-blue-200">
+                      127 recipients
+                    </div>
+                  </div>
+                  <div className="flex items-center interactive-card p-3 rounded-lg animate-fade-in opacity-75 hover:opacity-100 transition-opacity" style={{ animationDelay: '100ms' }}>
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 flex items-center justify-center">
+                      <Users className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div className="ml-4 space-y-1 flex-1">
+                      <p className="text-sm font-medium leading-none">
+                        Birthday greetings sent to <span className="font-semibold text-purple-600">December Celebrants</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        2 hours ago • Smart automation triggered
+                      </p>
+                    </div>
+                    <div className="ml-auto font-medium text-xs text-muted-foreground bg-purple-50 px-2 py-1 rounded-full border border-purple-200">
+                      8 recipients
+                    </div>
                   </div>
                 </div>
-              ))}
-              {!logs?.length && (
+              )}
+              {user && !logs?.length && (
                 <div className="text-center py-8 text-muted-foreground">
                   <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   No recent activity
@@ -203,7 +370,68 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <UpcomingSchedules />
+        {user ? <UpcomingSchedules /> : (
+          <Card className="col-span-1 glass hover-lift animate-slide-up" style={{ animationDelay: '400ms' }}>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Upcoming Schedules
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center interactive-card p-3 rounded-lg animate-fade-in opacity-75 hover:opacity-100 transition-opacity">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/30 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="ml-4 space-y-1 flex-1">
+                    <p className="text-sm font-medium leading-none">
+                      Welcome message to <span className="font-semibold text-emerald-600">New Clients</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Tomorrow at 9:00 AM • Automated onboarding
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="ml-auto bg-emerald-50 text-emerald-700 border-emerald-200">
+                    Scheduled
+                  </Badge>
+                </div>
+                <div className="flex items-center interactive-card p-3 rounded-lg animate-fade-in opacity-75 hover:opacity-100 transition-opacity" style={{ animationDelay: '50ms' }}>
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="ml-4 space-y-1 flex-1">
+                    <p className="text-sm font-medium leading-none">
+                      Monthly newsletter to <span className="font-semibold text-blue-600">All Contacts</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Dec 20, 2025 at 10:00 AM • Recurring campaign
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="ml-auto bg-blue-50 text-blue-700 border-blue-200">
+                    Recurring
+                  </Badge>
+                </div>
+                <div className="flex items-center interactive-card p-3 rounded-lg animate-fade-in opacity-75 hover:opacity-100 transition-opacity" style={{ animationDelay: '100ms' }}>
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div className="ml-4 space-y-1 flex-1">
+                    <p className="text-sm font-medium leading-none">
+                      Holiday greetings to <span className="font-semibold text-purple-600">VIP Customers</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Dec 25, 2025 at 8:00 AM • Seasonal campaign
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="ml-auto bg-purple-50 text-purple-700 border-purple-200">
+                    One-time
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="col-span-1 glass hover-lift animate-slide-up" style={{ animationDelay: '500ms' }}>
           <CardHeader className="pb-4">
@@ -214,7 +442,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3">
-              <Link href="/contacts?create=true" className="group">
+              <Link href={user ? "/contacts?create=true" : "#"} onClick={(e) => !handleAuthRequiredAction("create contacts") && e.preventDefault()} className="group">
                 <div className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 hover-lift hover-glow transition-all duration-300 cursor-pointer">
                   <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 group-hover:scale-110 transition-transform duration-300">
                     <Users className="h-6 w-6 text-blue-400" />
@@ -229,7 +457,7 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              <Link href="/groups?create=true" className="group">
+              <Link href={user ? "/groups?create=true" : "#"} onClick={(e) => !handleAuthRequiredAction("create groups") && e.preventDefault()} className="group">
                 <div className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 hover-lift hover-glow transition-all duration-300 cursor-pointer">
                   <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 group-hover:scale-110 transition-transform duration-300">
                     <Layers className="h-6 w-6 text-purple-400" />

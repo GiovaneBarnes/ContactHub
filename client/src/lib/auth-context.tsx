@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from './types';
-import { api } from './mock-api';
+import { firebaseApi } from './firebase-api';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from 'firebase/auth';
+import { auth } from './firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -21,19 +23,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // Check session
-    api.auth.getCurrentUser()
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setIsLoading(false));
+    // Listen to auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          name: firebaseUser.displayName || firebaseUser.email || ''
+        });
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return unsubscribe;
   }, []);
 
   const login = async (email: string, pass: string) => {
     try {
-      const user = await api.auth.login(email, pass);
-      setUser(user);
+      await signInWithEmailAndPassword(auth, email, pass);
       setLocation('/');
-      toast({ title: "Welcome back!", description: `Logged in as ${user.name}` });
+      toast({ title: "Welcome back!", description: `Logged in as ${email}` });
     } catch (e) {
       toast({ title: "Login failed", description: (e as Error).message, variant: "destructive" });
       throw e;
@@ -42,8 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (email: string, pass: string, name: string) => {
     try {
-      const user = await api.auth.signup(email, pass, name);
-      setUser(user);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      // Update display name
+      await updateProfile(userCredential.user, {
+        displayName: name
+      });
       setLocation('/');
       toast({ title: "Account created", description: "Welcome to Contact App!" });
     } catch (e) {
@@ -52,10 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setLocation('/auth');
-    toast({ title: "Logged out" });
+  const logout = async () => {
+    try {
+      await firebaseSignOut(auth);
+      setLocation('/auth');
+      toast({ title: "Logged out", description: "See you next time!" });
+    } catch (e) {
+      toast({ title: "Logout failed", description: (e as Error).message, variant: "destructive" });
+    }
   };
 
   return (
