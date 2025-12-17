@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/mock-api";
+import { firebaseApi } from "@/lib/firebase-api";
 import { Contact } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,11 +76,11 @@ export default function ContactsPage() {
 
   const { data: contacts, isLoading } = useQuery({ 
     queryKey: ['contacts'], 
-    queryFn: api.contacts.list 
+    queryFn: firebaseApi.contacts.list 
   });
 
   const createMutation = useMutation({
-    mutationFn: api.contacts.create,
+    mutationFn: firebaseApi.contacts.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       setIsOpen(false);
@@ -90,7 +90,7 @@ export default function ContactsPage() {
 
   const updateMutation = useMutation({
     mutationFn: (data: { id: string; data: Partial<Contact> }) => 
-      api.contacts.update(data.id, data.data),
+      firebaseApi.contacts.update(data.id, data.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       setIsOpen(false);
@@ -100,7 +100,7 @@ export default function ContactsPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: api.contacts.delete,
+    mutationFn: firebaseApi.contacts.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       setDeleteContactId(null);

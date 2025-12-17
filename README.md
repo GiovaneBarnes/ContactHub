@@ -35,6 +35,8 @@ A full-stack web application for managing phone contacts and groups, built with 
 2. Install dependencies:
    ```bash
    npm install
+   npm install firebase
+   npm install -g firebase-tools
    ```
 
 3. Set up environment variables:
@@ -80,3 +82,4 @@ The app is configured for deployment on platforms like Vercel, Netlify, or Railw
 ## License
 
 MIT
+
