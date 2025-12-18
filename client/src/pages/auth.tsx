@@ -26,14 +26,34 @@ import { validateEmail, sanitizeInput, rateLimiter, SECURITY_CONFIG } from "@/li
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Check, X } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
 });
 
-const signupSchema = loginSchema.extend({
-  name: z.string().min(2),
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .refine((password) => {
+    const requirements = [];
+    if (!/[a-z]/.test(password)) requirements.push("lowercase letter");
+    if (!/[A-Z]/.test(password)) requirements.push("uppercase letter");
+    if (!/\d/.test(password)) requirements.push("number");
+    
+    if (requirements.length > 0) {
+      return {
+        message: `Password must contain at least one ${requirements.join(", ")}`,
+        path: ["password"]
+      };
+    }
+    return true;
+  });
+
+const signupSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  password: passwordSchema,
 });
 
 export default function AuthPage() {
@@ -48,7 +68,7 @@ export default function AuthPage() {
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "user@example.com", password: "password" },
+    defaultValues: { email: "", password: "" },
   });
 
   const signupForm = useForm<z.infer<typeof signupSchema>>({
@@ -219,7 +239,7 @@ export default function AuthPage() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="name@example.com" {...field} />
+                          <Input {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -246,9 +266,6 @@ export default function AuthPage() {
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Sign In
                   </Button>
-                  <p className="text-xs text-center text-muted-foreground mt-2">
-                    Demo credentials: user@example.com / password
-                  </p>
                 </form>
               </Form>
             </TabsContent>
@@ -259,41 +276,102 @@ export default function AuthPage() {
                   <FormField
                     control={signupForm.control}
                     name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const nameValue = signupForm.watch("name");
+                      const isValidLength = nameValue.length >= 2;
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          {nameValue && (
+                            <div className="mt-1 flex items-center gap-2 text-sm">
+                              {isValidLength ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <X className="h-4 w-4 text-red-500" />
+                              )}
+                              <span className={isValidLength ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                At least 2 characters
+                              </span>
+                            </div>
+                          )}
+                        </FormItem>
+                      );
+                    }}
                   />
                   <FormField
                     control={signupForm.control}
                     name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="name@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const emailValue = signupForm.watch("email");
+                      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          {emailValue && (
+                            <div className="mt-1 flex items-center gap-2 text-sm">
+                              {isValidEmail ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <X className="h-4 w-4 text-red-500" />
+                              )}
+                              <span className={isValidEmail ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                Valid email format
+                              </span>
+                            </div>
+                          )}
+                        </FormItem>
+                      );
+                    }}
                   />
                   <FormField
                     control={signupForm.control}
                     name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const passwordValue = signupForm.watch("password");
+                      
+                      const requirements = [
+                        { label: "At least 8 characters", met: passwordValue.length >= 8 },
+                        { label: "One lowercase letter", met: /[a-z]/.test(passwordValue) },
+                        { label: "One uppercase letter", met: /[A-Z]/.test(passwordValue) },
+                        { label: "One number", met: /\d/.test(passwordValue) },
+                      ];
+
+                      return (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          {passwordValue && (
+                            <div className="mt-2 space-y-1">
+                              {requirements.map((req, index) => (
+                                <div key={index} className="flex items-center gap-2 text-sm">
+                                  {req.met ? (
+                                    <Check className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <X className="h-4 w-4 text-red-500" />
+                                  )}
+                                  <span className={req.met ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                    {req.label}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </FormItem>
+                      );
+                    }}
                   />
                   <Button
                     type="submit"

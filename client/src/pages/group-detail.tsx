@@ -44,7 +44,7 @@ export default function GroupDetailPage() {
     queryFn: firebaseApi.contacts.list
   });
 
-  const filteredContacts = allContacts?.filter(c => 
+  const filteredContacts = (allContacts || [])?.filter(c => 
     c.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
     c.email.toLowerCase().includes(memberSearch.toLowerCase()) ||
     c.phone.toLowerCase().includes(memberSearch.toLowerCase()) ||
@@ -77,7 +77,20 @@ export default function GroupDetailPage() {
     mutationFn: () => firebaseApi.messaging.send(id!, generatedMessage, ['sms', 'email']),
     onSuccess: () => {
       setGeneratedMessage("");
+      // Invalidate logs query to refresh the logs page
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
       toast({ title: "Message sent!", description: "Check logs for delivery status." });
+    },
+    onError: (error) => {
+      console.error('🔴 UI Error Handler: Message send failed');
+      console.error('🔴 Error object:', error);
+      console.error('🔴 Error message:', error.message);
+      console.error('🔴 Error stack:', error.stack);
+      toast({ 
+        title: "Failed to send message", 
+        description: error.message || "Please try again or check your group settings.",
+        variant: "destructive"
+      });
     }
   });
 
@@ -86,9 +99,10 @@ export default function GroupDetailPage() {
   }
 
   const toggleContact = (contactId: string) => {
-    const newIds = group.contactIds.includes(contactId)
-      ? group.contactIds.filter(id => id !== contactId)
-      : [...group.contactIds, contactId];
+    const currentIds = group.contactIds || [];
+    const newIds = currentIds.includes(contactId)
+      ? currentIds.filter(id => id !== contactId)
+      : [...currentIds, contactId];
     updateGroupMutation.mutate({ contactIds: newIds });
   };
 
@@ -152,7 +166,7 @@ export default function GroupDetailPage() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{group.contactIds.length}</div>
+                <div className="text-2xl font-bold">{(group.contactIds || []).length}</div>
                 <p className="text-xs text-muted-foreground">
                   Active contacts in this group
                 </p>
@@ -375,7 +389,7 @@ export default function GroupDetailPage() {
                   >
                     <Checkbox 
                       id={`contact-${contact.id}`} 
-                      checked={group.contactIds.includes(contact.id)}
+                      checked={(group.contactIds || []).includes(contact.id)}
                       onCheckedChange={() => toggleContact(contact.id)}
                       className="hover-scale"
                       onClick={(e) => e.stopPropagation()} // Prevent double-clicking
@@ -426,7 +440,7 @@ export default function GroupDetailPage() {
               {/* Quick Stats */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="text-2xl font-bold text-primary">{group.contactIds.length}</div>
+                  <div className="text-2xl font-bold text-primary">{(group.contactIds || []).length}</div>
                   <div className="text-xs text-muted-foreground">Recipients</div>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-lg">
@@ -470,11 +484,11 @@ export default function GroupDetailPage() {
 
                     <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                       <div className="text-sm text-muted-foreground">
-                        Ready to send to {group.contactIds.length} member{group.contactIds.length !== 1 ? 's' : ''}
+                        Ready to send to {(group.contactIds || []).length} member{(group.contactIds || []).length !== 1 ? 's' : ''}
                       </div>
                       <Button
                         onClick={() => sendMutation.mutate()}
-                        disabled={sendMutation.isPending || group.contactIds.length === 0}
+                        disabled={sendMutation.isPending || (group.contactIds || []).length === 0}
                         size="lg"
                       >
                         {sendMutation.isPending ? (

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { firebaseApi } from "@/lib/firebase-api";
 import { Contact } from "@/lib/types";
+import { getAuth } from "firebase/auth";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -75,9 +77,12 @@ export default function ContactsPage() {
     }
   }, []);
 
+  const { user } = useAuth();
+
   const { data: contacts, isLoading } = useQuery({ 
-    queryKey: ['contacts'], 
-    queryFn: firebaseApi.contacts.list 
+    queryKey: ['contacts', user?.id], 
+    queryFn: firebaseApi.contacts.list,
+    enabled: !!user 
   });
 
   const createMutation = useMutation({
@@ -127,11 +132,14 @@ export default function ContactsPage() {
       for (let i = 0; i < contacts.length; i++) {
         const contact = contacts[i];
         try {
-          await firebaseApi.contacts.create(contact);
-          results.push({ success: true, contact });
+          console.log(`Importing contact ${i + 1}/${contacts.length}:`, contact);
+          const createdContact = await firebaseApi.contacts.create(contact);
+          results.push({ success: true, contact: createdContact });
           setImportProgress((i + 1) / contacts.length * 100);
         } catch (error) {
-          results.push({ success: false, contact, error });
+          console.error(`Failed to import contact ${i + 1}:`, contact, error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          results.push({ success: false, contact, error: errorMessage });
         }
       }
       return results;
@@ -182,12 +190,24 @@ export default function ContactsPage() {
   };
 
   const sanitizeContact = (contact: any) => {
-    return {
+    const sanitized: any = {
       name: contact.name?.trim(),
-      email: contact.email?.trim().toLowerCase(),
-      phone: contact.phone?.replace(/[\s\-\(\)]/g, ''), // Clean phone format
-      notes: contact.notes?.trim() || ''
     };
+
+    // Only add email if it exists and is valid
+    if (contact.email?.trim()) {
+      sanitized.email = contact.email.trim().toLowerCase();
+    }
+
+    // Only add phone if it exists
+    if (contact.phone?.replace(/[\s\-\(\)]/g, '')) {
+      sanitized.phone = contact.phone.replace(/[\s\-\(\)]/g, '');
+    }
+
+    // Always add notes (can be empty string)
+    sanitized.notes = contact.notes?.trim() || '';
+
+    return sanitized;
   };
 
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -302,33 +322,66 @@ export default function ContactsPage() {
 
   const parseVCF = (vcfText: string) => {
     const contacts: any[] = [];
-    const vcards = vcfText.split('BEGIN:VCARD');
-    
-    vcards.forEach(vcard => {
+    // Split by BEGIN:VCARD and filter out empty entries
+    const vcardBlocks = vcfText.split('BEGIN:VCARD').filter(block => block.trim());
+
+    vcardBlocks.forEach(vcard => {
       if (!vcard.includes('END:VCARD')) return;
-      
+
       const contact: any = {};
-      const lines = vcard.split('\n');
-      
+      // Split by lines and clean up
+      const lines = vcard.split('\n').map(line => line.trim()).filter(line => line);
+
       lines.forEach(line => {
-        if (line.startsWith('FN:') || line.startsWith('N:')) {
+        // Handle different VCF field formats
+        if (line.startsWith('FN:') || line.startsWith('FN;')) {
           contact.name = line.split(':')[1]?.trim();
-        } else if (line.startsWith('EMAIL')) {
-          contact.email = line.split(':')[1]?.trim();
-        } else if (line.startsWith('TEL')) {
-          contact.phone = line.split(':')[1]?.trim();
-        } else if (line.startsWith('NOTE')) {
+        } else if (line.startsWith('N:') || line.startsWith('N;')) {
+          // Parse N field (Last;First;Middle;Prefix;Suffix)
+          const nParts = line.split(':')[1]?.split(';') || [];
+          if (nParts.length >= 2) {
+            const firstName = nParts[1]?.trim() || '';
+            const lastName = nParts[0]?.trim() || '';
+            if (!contact.name) {
+              contact.name = `${firstName} ${lastName}`.trim();
+            }
+          }
+        } else if (line.startsWith('EMAIL') && line.includes(':')) {
+          const emailValue = line.split(':')[1]?.trim();
+          if (emailValue && !contact.email) { // Take first email found
+            contact.email = emailValue;
+          }
+        } else if (line.startsWith('TEL') && line.includes(':')) {
+          const phoneValue = line.split(':')[1]?.trim();
+          if (phoneValue && !contact.phone) { // Take first phone found
+            contact.phone = phoneValue;
+          }
+        } else if (line.startsWith('NOTE') && line.includes(':')) {
           contact.notes = line.split(':')[1]?.trim();
         }
       });
-      
-      if (contact.name) contacts.push(contact);
+
+      // Only add contact if it has a name
+      if (contact.name && contact.name.trim()) {
+        contacts.push(contact);
+      }
     });
-    
+
     return contacts;
   };
 
   const handleImport = () => {
+    // Check if user is authenticated
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to import contacts.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (importData.length > 0) {
       importMutation.mutate(importData);
     }

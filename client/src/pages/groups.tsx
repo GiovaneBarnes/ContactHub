@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { firebaseApi } from "@/lib/firebase-api";
 import { Group } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,9 +70,12 @@ export default function GroupsPage() {
     }
   }, []);
 
+  const { user } = useAuth();
+
   const { data: groups, isLoading } = useQuery({ 
-    queryKey: ['groups'], 
-    queryFn: firebaseApi.groups.list 
+    queryKey: ['groups', user?.id], 
+    queryFn: firebaseApi.groups.list,
+    enabled: !!user 
   });
 
   const createMutation = useMutation({

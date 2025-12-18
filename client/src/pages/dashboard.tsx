@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { metricsService } from "@/lib/metrics";
+import { useEffect } from "react";
 
 export default function Dashboard() {
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
@@ -32,6 +34,11 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading } = useAuth();
+
+  // Track page view
+  useEffect(() => {
+    metricsService.trackPageView('dashboard');
+  }, []);
 
   const { data: contacts } = useQuery({ 
     queryKey: ['contacts'], 
@@ -87,6 +94,7 @@ export default function Dashboard() {
       return;
     }
     setIsDraftModalOpen(true);
+    metricsService.trackFeatureUsage('draft_message_modal');
   };
 
   const handleCloseDraftModal = () => {
@@ -115,6 +123,7 @@ export default function Dashboard() {
 
     if (sendImmediately) {
       sendMessageMutation.mutate({ groupId: selectedGroupId, content: messageContent });
+      metricsService.trackFeatureUsage('send_message_immediate');
     } else {
       if (!scheduledDate || !scheduledTime) {
         toast({ title: "Please select date and time for scheduling", variant: "destructive" });
@@ -133,6 +142,7 @@ export default function Dashboard() {
       };
 
       scheduleMessageMutation.mutate({ groupId: selectedGroupId, schedule });
+      metricsService.trackFeatureUsage('schedule_message');
     }
   };
 

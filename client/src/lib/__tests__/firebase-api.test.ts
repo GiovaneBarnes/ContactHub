@@ -40,17 +40,47 @@ vi.mock('firebase/firestore', () => ({
   }
 }))
 
+// Mock Firebase Functions
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(() => 'mock-functions'),
+  httpsCallable: vi.fn(() => vi.fn(() => Promise.reject(new Error('SMS failed'))))
+}))
+
 // Mock Firebase Auth
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => ({
-    currentUser: { uid: 'test-user-id', email: 'test@example.com', displayName: 'Test User' }
+    currentUser: { 
+      uid: 'test-user-id', 
+      email: 'test@example.com', 
+      displayName: 'Test User',
+      getIdToken: vi.fn(() => Promise.resolve('mock-id-token'))
+    },
+    onAuthStateChanged: vi.fn((callback) => {
+      callback({ 
+        uid: 'test-user-id', 
+        email: 'test@example.com', 
+        displayName: 'Test User',
+        getIdToken: vi.fn(() => Promise.resolve('mock-id-token'))
+      })
+      return vi.fn()
+    })
   }))
 }))
 
 vi.mock('../firebase', () => ({
   db: { type: 'firestore-mock' },
-  firebaseApp: { type: 'firebase-app-mock' }
+  auth: { type: 'auth-mock' },
+  functions: { type: 'functions-mock' },
+  firebaseApp: { type: 'firebase-app-mock' },
+  analytics: { 
+    type: 'analytics-mock',
+    options: { projectId: 'test-project' },
+    app: { options: { projectId: 'test-project' } }
+  }
 }))
+
+// Mock fetch for SMS sending
+global.fetch = vi.fn()
 
 // Mock data
 const mockContact = {
@@ -519,11 +549,27 @@ describe('Firebase API', () => {
         data: () => mockGroup
       }
 
-      const mockSnapshot = {
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => ({
+          name: 'John Doe',
+          email: 'john@example.com',
+          phone: '+1234567890',
+          userId: 'test-user-id'
+        })
+      }
+
+      const mockGroupSnapshot = {
         docs: [mockGroupDoc]
       }
 
-      vi.mocked(getDocs).mockResolvedValue(mockSnapshot as any)
+      const mockContactsSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      // Mock the first call (groups query) and second call (contacts query)
+      vi.mocked(getDocs).mockResolvedValueOnce(mockGroupSnapshot as any)
+        .mockResolvedValueOnce(mockContactsSnapshot as any)
 
       await firebaseApi.messaging.send('group-1', 'Test message', ['sms'])
 
@@ -532,6 +578,80 @@ describe('Firebase API', () => {
         groupName: 'Test Group',
         messageContent: 'Test message',
         recipients: 1,
+        deliveryMethod: 'sms',
+        recipientDetails: expect.arrayContaining([
+          expect.objectContaining({
+            contactId: 'contact-1',
+            name: 'John Doe',
+            email: 'john@example.com',
+            phone: '+1234567890',
+            smsStatus: 'failed',
+            emailStatus: 'not_sent',
+            errorMessage: expect.stringContaining('SMS failed')
+          })
+        ]),
+        userId: 'test-user-id',
+        timestamp: 'server-timestamp',
+        status: 'failed'
+      })
+    })
+
+    it('should send message to group with successful SMS delivery', async () => {
+      // Mock fetch to return successful SMS response
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true, messageId: 'sms-123' })
+      } as any)
+
+      const mockGroupDoc = {
+        id: 'group-1',
+        data: () => ({
+          name: 'Test Group',
+          contactIds: ['contact-1'],
+          userId: 'test-user-id'
+        })
+      }
+
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => ({
+          name: 'John Doe',
+          email: 'john@example.com',
+          phone: '+1234567890',
+          userId: 'test-user-id'
+        })
+      }
+
+      const mockGroupSnapshot = {
+        docs: [mockGroupDoc]
+      }
+
+      const mockContactsSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      // Mock the first call (groups query) and second call (contacts query)
+      vi.mocked(getDocs).mockResolvedValueOnce(mockGroupSnapshot as any)
+        .mockResolvedValueOnce(mockContactsSnapshot as any)
+
+      await firebaseApi.messaging.send('group-1', 'Test message', ['sms'])
+
+      expect(addDoc).toHaveBeenNthCalledWith(1, 'mock-collection', {
+        groupId: 'group-1',
+        groupName: 'Test Group',
+        messageContent: 'Test message',
+        recipients: 1,
+        deliveryMethod: 'sms',
+        recipientDetails: expect.arrayContaining([
+          expect.objectContaining({
+            contactId: 'contact-1',
+            name: 'John Doe',
+            email: 'john@example.com',
+            phone: '+1234567890',
+            smsStatus: 'sent',
+            emailStatus: 'not_sent'
+          })
+        ]),
         userId: 'test-user-id',
         timestamp: 'server-timestamp',
         status: 'sent'
@@ -546,6 +666,107 @@ describe('Firebase API', () => {
       vi.mocked(getDocs).mockResolvedValue(mockSnapshot as any)
 
       await expect(firebaseApi.messaging.send('non-existent', 'Test', ['sms'])).rejects.toThrow('Group not found')
+    })
+
+    it('should throw error when message content is empty', async () => {
+      await expect(firebaseApi.messaging.send('group-1', '', ['sms'])).rejects.toThrow('Message content cannot be empty')
+    })
+
+    it('should throw error when no channels specified', async () => {
+      await expect(firebaseApi.messaging.send('group-1', 'Test message', [])).rejects.toThrow('At least one delivery channel must be selected')
+    })
+
+    it('should throw error when group has no members', async () => {
+      const mockGroupDoc = {
+        id: 'group-1',
+        data: () => ({
+          name: 'Test Group',
+          contactIds: [],
+          schedules: [],
+          backgroundInfo: 'Test background',
+          enabled: true
+        })
+      }
+
+      const mockGroupSnapshot = {
+        docs: [mockGroupDoc]
+      }
+
+      vi.mocked(getDocs).mockResolvedValueOnce(mockGroupSnapshot as any)
+
+      await expect(firebaseApi.messaging.send('group-1', 'Test message', ['sms'])).rejects.toThrow('Cannot send message: group has no members')
+    })
+
+    it('should throw error when group has no valid SMS contacts', async () => {
+      const mockGroupDoc = {
+        id: 'group-1',
+        data: () => ({
+          name: 'Test Group',
+          contactIds: ['contact-1'],
+          schedules: [],
+          backgroundInfo: 'Test background',
+          enabled: true
+        })
+      }
+
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => ({
+          name: 'John Doe',
+          email: 'john@example.com',
+          phone: '', // No phone
+          userId: 'test-user-id'
+        })
+      }
+
+      const mockGroupSnapshot = {
+        docs: [mockGroupDoc]
+      }
+
+      const mockContactsSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      vi.mocked(getDocs).mockResolvedValueOnce(mockGroupSnapshot as any)
+        .mockResolvedValueOnce(mockContactsSnapshot as any)
+
+      await expect(firebaseApi.messaging.send('group-1', 'Test message', ['sms'])).rejects.toThrow('Cannot send SMS: no group members have valid phone numbers')
+    })
+
+    it('should throw error when group has no valid email contacts', async () => {
+      const mockGroupDoc = {
+        id: 'group-1',
+        data: () => ({
+          name: 'Test Group',
+          contactIds: ['contact-1'],
+          schedules: [],
+          backgroundInfo: 'Test background',
+          enabled: true
+        })
+      }
+
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => ({
+          name: 'John Doe',
+          email: '', // No email
+          phone: '+1234567890',
+          userId: 'test-user-id'
+        })
+      }
+
+      const mockGroupSnapshot = {
+        docs: [mockGroupDoc]
+      }
+
+      const mockContactsSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      vi.mocked(getDocs).mockResolvedValueOnce(mockGroupSnapshot as any)
+        .mockResolvedValueOnce(mockContactsSnapshot as any)
+
+      await expect(firebaseApi.messaging.send('group-1', 'Test message', ['email'])).rejects.toThrow('Cannot send email: no group members have valid email addresses')
     })
   })
 })

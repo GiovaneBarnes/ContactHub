@@ -12,9 +12,11 @@ import {
   Timestamp
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 import { db } from "./firebase";
 import { Contact, Group, MessageLog, User } from "./types";
 import ContactHubAI from './contact-hub-ai';
+import { metricsService } from './metrics';
 
 // Collections
 const CONTACTS_COLLECTION = "contacts";
@@ -36,6 +38,17 @@ const getCurrentUserIdSafe = (): string | null => {
   const auth = getAuth();
   const user = auth.currentUser;
   return user ? user.uid : null;
+};
+
+// Helper to clean data for Firestore (remove undefined values)
+const cleanFirestoreData = (data: any): any => {
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
 };
 
 // Helper to convert Firestore doc to Contact
@@ -102,29 +115,43 @@ export const firebaseApi = {
     create: async (data: Omit<Contact, 'id'>): Promise<Contact> => {
       const userId = getCurrentUserId();
       const contactsRef = collection(db, CONTACTS_COLLECTION);
+      const cleanedData = cleanFirestoreData(data);
       const docRef = await addDoc(contactsRef, {
-        ...data,
+        ...cleanedData,
         userId,
         createdAt: serverTimestamp()
       });
-      return {
+      const contact = {
         id: docRef.id,
         ...data
       };
+      await metricsService.trackContactAction('create', {
+        contactId: contact.id,
+        hasEmail: !!data.email,
+        hasPhone: !!data.phone
+      });
+      return contact;
     },
 
     update: async (id: string, data: Partial<Contact>): Promise<Contact> => {
       const docRef = doc(db, CONTACTS_COLLECTION, id);
+      const cleanedData = cleanFirestoreData(data);
       await updateDoc(docRef, {
-        ...data,
+        ...cleanedData,
         updatedAt: serverTimestamp()
       });
-      return { id, ...data } as Contact;
+      const contact = { id, ...data } as Contact;
+      await metricsService.trackContactAction('update', {
+        contactId: id,
+        fieldsUpdated: Object.keys(data)
+      });
+      return contact;
     },
 
     delete: async (id: string): Promise<void> => {
       const docRef = doc(db, CONTACTS_COLLECTION, id);
       await deleteDoc(docRef);
+      await metricsService.trackContactAction('delete', { contactId: id });
     }
   },
 
@@ -431,28 +458,228 @@ export const firebaseApi = {
 
   messaging: {
     send: async (groupId: string, content: string, channels: ('sms' | 'email')[]): Promise<void> => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const userId = getCurrentUserId();
-      const groupsRef = collection(db, GROUPS_COLLECTION);
-      const q = query(groupsRef, where("userId", "==", userId));
-      const snapshot = await getDocs(q);
-      const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
-      
-      if (!groupDoc) throw new Error('Group not found');
-      
-      const group = docToGroup(groupDoc);
-      
-      const logsRef = collection(db, LOGS_COLLECTION);
-      await addDoc(logsRef, {
-        groupId: group.id,
-        groupName: group.name,
-        messageContent: content,
-        recipients: group.contactIds.length,
-        userId,
-        timestamp: serverTimestamp(),
-        status: 'sent'
-      });
+      // Debug logging removed for production
+
+      try {
+        // Validate input
+        if (!content || content.trim().length === 0) {
+          console.error('❌ Validation failed: Empty message content');
+          throw new Error('Message content cannot be empty');
+        }
+        if (!channels || channels.length === 0) {
+          console.error('❌ Validation failed: No channels specified');
+          throw new Error('At least one delivery channel must be selected');
+        }
+
+        // Input validation passed
+
+        // Simulate realistic processing time (2-5 seconds for actual sending)
+        // Skip delay in test environment
+        if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+          await new Promise(resolve => setTimeout(resolve, Math.random() * 3000 + 2000));
+        }
+
+        // Get current user
+        const userId = getCurrentUserId();
+
+        if (!userId) {
+          console.error('❌ No authenticated user found');
+          throw new Error('User not authenticated');
+        }
+
+        const groupsRef = collection(db, GROUPS_COLLECTION);
+        const q = query(groupsRef, where("userId", "==", userId));
+        const snapshot = await getDocs(q);
+
+        const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
+
+        if (!groupDoc) {
+          console.error('❌ Group not found:', groupId);
+          throw new Error('Group not found');
+        }
+
+        const group = docToGroup(groupDoc);
+
+        // Validate group has contacts
+        if (!group.contactIds || group.contactIds.length === 0) {
+          console.error('❌ Group has no members');
+          throw new Error('Cannot send message: group has no members');
+        }
+
+        // Get actual contacts for the group
+        const contactsRef = collection(db, CONTACTS_COLLECTION);
+        const contactsQuery = query(contactsRef, where("userId", "==", userId));
+        const contactsSnapshot = await getDocs(contactsQuery);
+        const allContacts = contactsSnapshot.docs.map(docToContact);
+
+        // Filter contacts that are in this group
+        const groupContacts = allContacts.filter(contact => group.contactIds.includes(contact.id));
+
+        if (groupContacts.length === 0) {
+          console.error('❌ No valid contacts found in group after filtering');
+          throw new Error('Cannot send message: no valid contacts found in group');
+        }
+
+        // Check if any contacts have valid delivery methods
+        const hasValidEmailContacts = groupContacts.some(contact => contact.email && contact.email.trim().length > 0);
+        const hasValidSmsContacts = groupContacts.some(contact => contact.phone && contact.phone.trim().length > 0);
+
+        const requestingEmail = channels.includes('email');
+        const requestingSms = channels.includes('sms');
+
+        if (requestingEmail && !hasValidEmailContacts) {
+          console.error('❌ Email validation failed: no valid email contacts in group');
+          throw new Error('Cannot send email: no group members have valid email addresses');
+        }
+        if (requestingSms && !hasValidSmsContacts) {
+          console.error('❌ SMS validation failed: no valid SMS contacts in group');
+          throw new Error('Cannot send SMS: no group members have valid phone numbers');
+        }
+
+        // All validations passed, proceeding with message delivery
+
+        // Get the current user's ID token
+        const user = getAuth().currentUser;
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+        const idToken = await user.getIdToken();
+
+        const recipientDetails = [];
+        let successCount = 0;
+        let failureCount = 0;
+
+        try {
+
+          for (const contact of groupContacts) {
+
+            const recipientDetail = {
+              contactId: contact.id,
+              name: contact.name,
+              email: contact.email,
+              phone: contact.phone,
+              smsStatus: 'not_sent' as 'sent' | 'failed' | 'not_sent',
+              emailStatus: 'not_sent' as 'sent' | 'failed' | 'not_sent',
+              errorMessage: undefined as string | undefined
+            };
+
+            // Send email if requested and contact has email
+            if (requestingEmail && contact.email) {
+              try {
+                const response = await fetch('https://us-central1-contacthub-29950.cloudfunctions.net/sendEmail', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                  },
+                  body: JSON.stringify({
+                    to: contact.email,
+                    subject: `Message from ${group.name}`,
+                    text: content,
+                    fromName: group.name
+                  }),
+                });
+
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                recipientDetail.emailStatus = 'sent';
+                successCount++;
+              } catch (error) {
+                console.error(`❌ Failed to send email to ${contact.name}:`, error);
+                recipientDetail.emailStatus = 'failed';
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                recipientDetail.errorMessage = `Email failed: ${errorMessage}`;
+                failureCount++;
+              }
+            }
+
+            // Send SMS if requested and contact has phone
+            if (requestingSms && contact.phone) {
+              try {
+                const response = await fetch('https://us-central1-contacthub-29950.cloudfunctions.net/sendSMS', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                  },
+                  body: JSON.stringify({
+                    to: contact.phone,
+                    message: content
+                  }),
+                });
+
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                recipientDetail.smsStatus = 'sent';
+                successCount++;
+              } catch (error) {
+                console.error(`❌ Failed to send SMS to ${contact.name}:`, error);
+                recipientDetail.smsStatus = 'failed';
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                if (recipientDetail.errorMessage) {
+                  recipientDetail.errorMessage += `; SMS failed: ${errorMessage}`;
+                } else {
+                  recipientDetail.errorMessage = `SMS failed: ${errorMessage}`;
+                }
+                failureCount++;
+              }
+            }
+
+            recipientDetails.push(recipientDetail);
+          }
+        } catch (loopError) {
+          console.error('💥 Unexpected error in sending loop:', loopError);
+          throw loopError;
+        }
+
+        // Determine delivery method
+        let deliveryMethod: 'sms' | 'email' | 'both' = 'sms';
+        if (channels.includes('email') && channels.includes('sms')) {
+          deliveryMethod = 'both';
+        } else if (channels.includes('email')) {
+          deliveryMethod = 'email';
+        }
+
+        const logsRef = collection(db, LOGS_COLLECTION);
+
+        // Clean recipient details to remove undefined values (Firestore doesn't allow them)
+        const cleanedRecipientDetails = recipientDetails.map(recipient =>
+          cleanFirestoreData(recipient)
+        );
+
+        await addDoc(logsRef, cleanFirestoreData({
+          groupId: group.id,
+          groupName: group.name,
+          messageContent: content,
+          recipients: recipientDetails.length,
+          deliveryMethod,
+          recipientDetails: cleanedRecipientDetails,
+          userId,
+          timestamp: serverTimestamp(),
+          status: successCount > 0 ? 'sent' : 'failed'
+        }));
+
+        await metricsService.trackMessageAction('send', {
+          groupId,
+          groupName: group.name,
+          recipientCount: recipientDetails.length,
+          channels,
+          messageLength: content.length,
+          isGroupMessage: true
+        });
+
+      } catch (error) {
+        console.error('💥 Message send failed with error:', error);
+        throw error;
+      }
     }
   }
 };

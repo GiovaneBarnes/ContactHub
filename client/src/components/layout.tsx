@@ -6,7 +6,9 @@ import {
   Layers, 
   History, 
   LogOut, 
-  Menu
+  Menu,
+  BarChart3,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -18,12 +20,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navItems = [
+  // Admin access control
+  const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(',').map((email: string) => email.trim()) || [];
+  const isAdmin = user?.email && adminEmails.includes(user.email);
+
+  const baseNavItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/contacts", label: "Contacts", icon: Users },
     { href: "/groups", label: "Groups", icon: Layers },
     { href: "/logs", label: "Message Logs", icon: History },
+    { href: "/insights", label: "My Insights", icon: Sparkles },
   ];
+
+  const adminNavItems = [
+    { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  ];
+
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
 
   const NavContent = () => (
     <div className="flex flex-col h-full glass border-r border-border/50">

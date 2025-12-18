@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
+import { getFunctions } from 'firebase/functions'
 import { getAnalytics } from 'firebase/analytics'
 
 // Mock Firebase modules
@@ -10,11 +11,26 @@ vi.mock('firebase/app', () => ({
 }))
 
 vi.mock('firebase/firestore', () => ({
-  getFirestore: vi.fn(() => ({ type: 'firestore' }))
+  getFirestore: vi.fn(() => ({ type: 'firestore' })),
+  connectFirestoreEmulator: vi.fn()
 }))
 
 vi.mock('firebase/auth', () => ({
-  getAuth: vi.fn(() => ({ type: 'auth' }))
+  getAuth: vi.fn(() => ({
+    type: 'auth',
+    onAuthStateChanged: vi.fn((callback) => {
+      // Mock auth state change with a test user
+      callback({ uid: 'test-user-id', email: 'test@example.com' })
+      // Return unsubscribe function
+      return vi.fn()
+    })
+  })),
+  connectAuthEmulator: vi.fn()
+}))
+
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(() => ({ type: 'functions', region: 'us-central1' })),
+  connectFunctionsEmulator: vi.fn()
 }))
 
 vi.mock('firebase/analytics', () => ({
@@ -92,7 +108,17 @@ describe('Firebase Configuration', () => {
     const { auth } = await import('../firebase')
 
     expect(getAuth).toHaveBeenCalledWith({ name: 'test-app' })
-    expect(auth).toEqual({ type: 'auth' })
+    expect(auth).toHaveProperty('type', 'auth')
+    expect(auth).toHaveProperty('onAuthStateChanged')
+    expect(typeof auth.onAuthStateChanged).toBe('function')
+  })
+
+  it('should initialize Functions service', async () => {
+    const { functions } = await import('../firebase')
+
+    expect(getFunctions).toHaveBeenCalledWith({ name: 'test-app' }, 'us-central1')
+    expect(functions).toHaveProperty('type', 'functions')
+    expect(functions).toHaveProperty('region', 'us-central1')
   })
 
   it('should initialize Analytics service in browser environment', async () => {

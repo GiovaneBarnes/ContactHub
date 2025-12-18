@@ -5,7 +5,13 @@ import { AuthProvider, useAuth } from '../auth-context'
 
 // Mock Firebase Auth
 vi.mock('firebase/auth', () => ({
-  getAuth: vi.fn(() => ({ currentUser: null })),
+  getAuth: vi.fn(() => ({
+    currentUser: null,
+    onAuthStateChanged: vi.fn((callback) => {
+      callback(null)
+      return vi.fn()
+    })
+  })),
   onAuthStateChanged: vi.fn(),
   signInWithEmailAndPassword: vi.fn(),
   createUserWithEmailAndPassword: vi.fn(),
@@ -14,7 +20,13 @@ vi.mock('firebase/auth', () => ({
 }))
 
 vi.mock('../firebase', () => ({
-  auth: {}
+  auth: {},
+  analytics: { 
+    type: 'analytics-mock',
+    options: { projectId: 'test-project' },
+    app: { options: { projectId: 'test-project' } }
+  },
+  db: { type: 'firestore-mock' }
 }))
 
 // Mock wouter

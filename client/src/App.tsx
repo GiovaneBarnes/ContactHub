@@ -12,6 +12,8 @@ import ContactsPage from "@/pages/contacts";
 import GroupsPage from "@/pages/groups";
 import GroupDetailPage from "@/pages/group-detail";
 import LogsPage from "@/pages/logs";
+import AnalyticsDashboard from "@/pages/analytics";
+import PersonalInsights from "@/pages/insights";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -55,6 +57,12 @@ function Router() {
       </Route>
       <Route path="/logs">
         <ProtectedRoute component={LogsPage} />
+      </Route>
+      <Route path="/insights">
+        <ProtectedRoute component={PersonalInsights} />
+      </Route>
+      <Route path="/analytics">
+        <ProtectedRoute component={AnalyticsDashboard} />
       </Route>
 
       <Route component={NotFound} />

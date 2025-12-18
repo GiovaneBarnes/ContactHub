@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from 'firebase/auth';
 import { auth } from './firebase';
+import { metricsService } from './metrics';
 
 interface AuthContextType {
   user: User | null;
@@ -45,7 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signInWithEmailAndPassword(auth, email, pass);
       setLocation('/');
       toast({ title: "Welcome back!", description: `Logged in as ${email}` });
+      await metricsService.trackUserEngagement('login', { method: 'email' });
     } catch (e) {
+      await metricsService.trackUserEngagement('login_failed', { error: (e as Error).message });
       toast({ title: "Login failed", description: (e as Error).message, variant: "destructive" });
       throw e;
     }
@@ -60,7 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       setLocation('/');
       toast({ title: "Account created", description: "Welcome to Contact App!" });
+      await metricsService.trackUserEngagement('signup', { method: 'email' });
     } catch (e) {
+      await metricsService.trackUserEngagement('signup_failed', { error: (e as Error).message });
       toast({ title: "Signup failed", description: (e as Error).message, variant: "destructive" });
       throw e;
     }
@@ -71,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await firebaseSignOut(auth);
       setLocation('/auth');
       toast({ title: "Logged out", description: "See you next time!" });
+      await metricsService.trackUserEngagement('logout');
+      metricsService.endSession();
     } catch (e) {
       toast({ title: "Logout failed", description: (e as Error).message, variant: "destructive" });
     }

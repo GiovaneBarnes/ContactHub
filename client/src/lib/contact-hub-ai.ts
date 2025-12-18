@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { getFunctions } from 'firebase/functions';
 import firebaseApp from './firebase';
+import { metricsService } from './metrics';
 
 // Fallback implementations for when Firebase Functions are not available
 const fallbackMessageGeneration = (groupName: string, backgroundInfo: string): string => {
@@ -53,20 +54,49 @@ export class ContactHubAI {
     contactCount: number,
     lastContactDate?: string
   ): Promise<string> {
+    const startTime = Date.now();
     try {
       const functions = getFunctionsInstance();
+      let usedAI = false;
+      let message: string;
+
       if (functions) {
         const generateGroupMessageFn = httpsCallable<{ groupId: string }, { message: string; generatedAt: any }>(functions, 'generateGroupMessage');
         const result = await generateGroupMessageFn({ groupId: 'temp-group-id' });
-        return result.data.message;
+        message = result.data.message;
+        usedAI = true;
+      } else {
+        // Fallback when Firebase Functions not available
+        message = fallbackMessageGeneration(groupName, backgroundInfo);
       }
 
-      // Fallback when Firebase Functions not available
-      return fallbackMessageGeneration(groupName, backgroundInfo);
+      const duration = Date.now() - startTime;
+      await metricsService.trackAIAction('generate_message', {
+        groupName,
+        contactCount,
+        usedAI,
+        duration,
+        messageLength: message.length,
+        hasBackgroundInfo: !!backgroundInfo
+      });
+
+      return message;
     } catch (error) {
       console.error('AI Message Generation Error:', error);
       // Fallback to template-based generation
-      return fallbackMessageGeneration(groupName, backgroundInfo);
+      const message = fallbackMessageGeneration(groupName, backgroundInfo);
+      const duration = Date.now() - startTime;
+
+      await metricsService.trackAIAction('generate_message', {
+        groupName,
+        contactCount,
+        usedAI: false,
+        duration,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        fallbackUsed: true
+      });
+
+      return message;
     }
   }
 
@@ -82,18 +112,46 @@ export class ContactHubAI {
     tags: string[];
     reasoning: string;
   }> {
+    const startTime = Date.now();
     try {
       const functions = getFunctionsInstance();
+      let result: { categories: string[]; tags: string[]; reasoning: string; };
+
       if (functions) {
         const categorizeContactFn = httpsCallable<{ contactId: string }, { categories: string[]; tags: string[]; reasoning: string; generatedAt: any }>(functions, 'categorizeContact');
-        const result = await categorizeContactFn({ contactId: 'temp-contact-id' });
-        return result.data;
+        const response = await categorizeContactFn({ contactId: 'temp-contact-id' });
+        result = response.data;
+      } else {
+        result = fallbackCategorization(name);
       }
 
-      return fallbackCategorization(name);
+      const duration = Date.now() - startTime;
+      await metricsService.trackAIAction('categorize_contact', {
+        contactName: name,
+        hasEmail: !!email,
+        hasPhone: !!phone,
+        hasNotes: !!notes,
+        existingTagsCount: existingTags?.length || 0,
+        categoriesGenerated: result.categories.length,
+        tagsGenerated: result.tags.length,
+        duration,
+        usedAI: !!functions
+      });
+
+      return result;
     } catch (error) {
       console.error('AI Contact Categorization Error:', error);
-      return fallbackCategorization(name);
+      const result = fallbackCategorization(name);
+      const duration = Date.now() - startTime;
+
+      await metricsService.trackAIAction('categorize_contact', {
+        contactName: name,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        fallbackUsed: true,
+        duration
+      });
+
+      return result;
     }
   }
 
