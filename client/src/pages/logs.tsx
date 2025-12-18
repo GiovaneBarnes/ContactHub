@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -109,6 +110,9 @@ export default function LogsPage() {
                 {selectedLog?.status}
               </Badge>
             </DialogTitle>
+            <DialogDescription>
+              View detailed information about this message log entry.
+            </DialogDescription>
           </DialogHeader>
 
           {selectedLog && (

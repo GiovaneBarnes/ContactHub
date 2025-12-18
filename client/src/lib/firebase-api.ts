@@ -14,6 +14,7 @@ import {
 import { getAuth } from "firebase/auth";
 import { db } from "./firebase";
 import { Contact, Group, MessageLog, User } from "./types";
+import ContactHubAI from './contact-hub-ai';
 
 // Collections
 const CONTACTS_COLLECTION = "contacts";
@@ -258,25 +259,173 @@ export const firebaseApi = {
 
   ai: {
     generateMessage: async (groupId: string): Promise<string> => {
-      // Simulate AI processing - you can integrate with OpenAI or other services later
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
       const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
       const q = query(groupsRef, where("userId", "==", userId));
       const snapshot = await getDocs(q);
       const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
-      
+
       if (!groupDoc) throw new Error('Group not found');
-      
+
       const group = docToGroup(groupDoc);
-      
-      const prompts = [
-        `Hey everyone in ${group.name}, just checking in! ${group.backgroundInfo}`,
-        `Update for ${group.name}: ${group.backgroundInfo}. Let me know if you have questions.`,
-        `Greetings ${group.name} members! meaningful update based on: ${group.backgroundInfo}`,
-      ];
-      return prompts[Math.floor(Math.random() * prompts.length)];
+
+      // Get contact count for the group
+      const contactCount = group.contactIds?.length || 0;
+
+      // Get last contact date from message logs
+      const logsRef = collection(db, LOGS_COLLECTION);
+      const logsQuery = query(
+        logsRef,
+        where("userId", "==", userId),
+        where("groupId", "==", groupId),
+        orderBy("timestamp", "desc")
+      );
+      const logsSnapshot = await getDocs(logsQuery);
+      const lastLog = logsSnapshot.docs[0];
+      const lastContactDate = lastLog ? lastLog.data().timestamp.toDate().toISOString() : undefined;
+
+      // Use AI to generate personalized message
+      return await ContactHubAI.generatePersonalizedMessage(
+        group.name,
+        group.backgroundInfo || 'General group communication',
+        contactCount,
+        lastContactDate
+      );
+    },
+
+    // New AI-powered features
+    categorizeContact: async (contactId: string): Promise<{
+      categories: string[];
+      tags: string[];
+      reasoning: string;
+    }> => {
+      const userId = getCurrentUserId();
+      const contactDoc = await getDocs(query(
+        collection(db, CONTACTS_COLLECTION),
+        where("userId", "==", userId)
+      ));
+      const contact = contactDoc.docs.find(doc => doc.id === contactId);
+
+      if (!contact) throw new Error('Contact not found');
+
+      const contactData = docToContact(contact);
+      return await ContactHubAI.categorizeContact(
+        contactData.name,
+        contactData.email,
+        contactData.phone,
+        contactData.notes,
+        contactData.tags
+      );
+    },
+
+    analyzeCommunicationPatterns: async (contactId: string): Promise<{
+      frequency: string;
+      preferredMethod: string;
+      nextContactSuggestion: string;
+      insights: string[];
+    }> => {
+      const userId = getCurrentUserId();
+
+      // Get contact details
+      const contactDoc = await getDocs(query(
+        collection(db, CONTACTS_COLLECTION),
+        where("userId", "==", userId)
+      ));
+      const contact = contactDoc.docs.find(doc => doc.id === contactId);
+
+      if (!contact) throw new Error('Contact not found');
+
+      const contactData = docToContact(contact);
+
+      // Get communication history
+      const logsRef = collection(db, LOGS_COLLECTION);
+      const logsQuery = query(
+        logsRef,
+        where("userId", "==", userId),
+        where("contactId", "==", contactId),
+        orderBy("timestamp", "desc")
+      );
+      const logsSnapshot = await getDocs(logsQuery);
+      const messageLogs = logsSnapshot.docs.map(docToMessageLog);
+
+      return await ContactHubAI.analyzeCommunicationPatterns(
+        contactData.name,
+        messageLogs,
+        contactData.lastContact || 'Unknown',
+        contactData.relationship || 'professional'
+      );
+    },
+
+    suggestContactTime: async (contactId: string): Promise<{
+      recommendedTime: string;
+      reasoning: string;
+      alternatives: string[];
+    }> => {
+      const userId = getCurrentUserId();
+      const contactDoc = await getDocs(query(
+        collection(db, CONTACTS_COLLECTION),
+        where("userId", "==", userId)
+      ));
+      const contact = contactDoc.docs.find(doc => doc.id === contactId);
+
+      if (!contact) throw new Error('Contact not found');
+
+      const contactData = docToContact(contact);
+
+      // Get communication patterns from logs
+      const logsRef = collection(db, LOGS_COLLECTION);
+      const logsQuery = query(
+        logsRef,
+        where("userId", "==", userId),
+        where("contactId", "==", contactId),
+        orderBy("timestamp", "desc")
+      );
+      const logsSnapshot = await getDocs(logsQuery);
+      const responsePatterns = logsSnapshot.docs.slice(0, 10).map(doc => {
+        const data = doc.data();
+        return data.timestamp.toDate().toISOString();
+      });
+
+      return await ContactHubAI.suggestContactTime(
+        contactData.name,
+        contactData.timezone || 'UTC',
+        contactData.preferredContactTimes,
+        contactData.communicationStyle || 'professional',
+        contactData.lastContact,
+        responsePatterns
+      );
+    },
+
+    generateContactSummary: async (contactId: string): Promise<string> => {
+      const userId = getCurrentUserId();
+
+      // Get contact details
+      const contactDoc = await getDocs(query(
+        collection(db, CONTACTS_COLLECTION),
+        where("userId", "==", userId)
+      ));
+      const contact = contactDoc.docs.find(doc => doc.id === contactId);
+
+      if (!contact) throw new Error('Contact not found');
+
+      const contactData = docToContact(contact);
+
+      // Get recent interactions
+      const logsRef = collection(db, LOGS_COLLECTION);
+      const logsQuery = query(
+        logsRef,
+        where("userId", "==", userId),
+        where("contactId", "==", contactId),
+        orderBy("timestamp", "desc")
+      );
+      const logsSnapshot = await getDocs(logsQuery);
+      const interactions = logsSnapshot.docs.slice(0, 10).map(doc => ({
+        date: doc.data().timestamp.toDate().toISOString(),
+        type: doc.data().type,
+        content: doc.data().content
+      }));
+
+      return await ContactHubAI.generateContactSummary(contactData, interactions);
     }
   },
 

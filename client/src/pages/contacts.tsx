@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -594,6 +595,9 @@ END:VCARD`;
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingContact ? "Edit Contact" : "Create Contact"}</DialogTitle>
+            <DialogDescription>
+              {editingContact ? "Update the contact information." : "Add a new contact to your address book."}
+            </DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -699,9 +703,9 @@ END:VCARD`;
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Import Contacts</DialogTitle>
-            <p className="text-sm text-muted-foreground">
+            <DialogDescription>
               Upload a CSV file to import multiple contacts at once.
-            </p>
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">

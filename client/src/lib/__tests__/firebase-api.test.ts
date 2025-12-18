@@ -48,7 +48,8 @@ vi.mock('firebase/auth', () => ({
 }))
 
 vi.mock('../firebase', () => ({
-  db: { type: 'firestore-mock' }
+  db: { type: 'firestore-mock' },
+  firebaseApp: { type: 'firebase-app-mock' }
 }))
 
 // Mock data
@@ -351,11 +352,24 @@ describe('Firebase API', () => {
         data: () => mockGroup
       }
 
+      const mockLogsSnapshot = {
+        docs: [
+          {
+            data: () => ({
+              timestamp: {
+                toDate: () => new Date('2024-01-01T10:00:00Z')
+              }
+            })
+          }
+        ]
+      }
+
       const mockSnapshot = {
         docs: [mockGroupDoc]
       }
 
-      vi.mocked(getDocs).mockResolvedValue(mockSnapshot as any)
+      vi.mocked(getDocs).mockResolvedValueOnce(mockSnapshot as any)
+      vi.mocked(getDocs).mockResolvedValueOnce(mockLogsSnapshot as any)
 
       const result = await firebaseApi.ai.generateMessage('group-1')
 
@@ -372,6 +386,129 @@ describe('Firebase API', () => {
       vi.mocked(getDocs).mockResolvedValue(mockSnapshot as any)
 
       await expect(firebaseApi.ai.generateMessage('non-existent')).rejects.toThrow('Group not found')
+    })
+
+    it('should categorize contact', async () => {
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => mockContact
+      }
+
+      const mockSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      vi.mocked(getDocs).mockResolvedValue(mockSnapshot as any)
+
+      const result = await firebaseApi.ai.categorizeContact('contact-1')
+
+      expect(result).toHaveProperty('categories')
+      expect(result).toHaveProperty('tags')
+      expect(result).toHaveProperty('reasoning')
+      expect(Array.isArray(result.categories)).toBe(true)
+      expect(Array.isArray(result.tags)).toBe(true)
+    })
+
+    it('should analyze communication patterns', async () => {
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => mockContact
+      }
+
+      const mockLogsSnapshot = {
+        docs: [
+          {
+            data: () => ({
+              timestamp: {
+                toDate: () => new Date('2024-01-01T10:00:00Z')
+              },
+              type: 'email',
+              content: 'Test message'
+            })
+          }
+        ]
+      }
+
+      const mockSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      vi.mocked(getDocs).mockResolvedValueOnce(mockSnapshot as any)
+      vi.mocked(getDocs).mockResolvedValueOnce(mockLogsSnapshot as any)
+
+      const result = await firebaseApi.ai.analyzeCommunicationPatterns('contact-1')
+
+      expect(result).toHaveProperty('frequency')
+      expect(result).toHaveProperty('preferredMethod')
+      expect(result).toHaveProperty('nextContactSuggestion')
+      expect(result).toHaveProperty('insights')
+      expect(Array.isArray(result.insights)).toBe(true)
+    })
+
+    it('should suggest contact time', async () => {
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => mockContact
+      }
+
+      const mockLogsSnapshot = {
+        docs: [
+          {
+            data: () => ({
+              timestamp: {
+                toDate: () => new Date('2024-01-01T10:00:00Z')
+              }
+            })
+          }
+        ]
+      }
+
+      const mockSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      vi.mocked(getDocs).mockResolvedValueOnce(mockSnapshot as any)
+      vi.mocked(getDocs).mockResolvedValueOnce(mockLogsSnapshot as any)
+
+      const result = await firebaseApi.ai.suggestContactTime('contact-1')
+
+      expect(result).toHaveProperty('recommendedTime')
+      expect(result).toHaveProperty('reasoning')
+      expect(result).toHaveProperty('alternatives')
+      expect(Array.isArray(result.alternatives)).toBe(true)
+    })
+
+    it('should generate contact summary', async () => {
+      const mockContactDoc = {
+        id: 'contact-1',
+        data: () => mockContact
+      }
+
+      const mockLogsSnapshot = {
+        docs: [
+          {
+            data: () => ({
+              timestamp: {
+                toDate: () => new Date('2024-01-01T10:00:00Z')
+              },
+              type: 'email',
+              content: 'Test interaction'
+            })
+          }
+        ]
+      }
+
+      const mockSnapshot = {
+        docs: [mockContactDoc]
+      }
+
+      vi.mocked(getDocs).mockResolvedValueOnce(mockSnapshot as any)
+      vi.mocked(getDocs).mockResolvedValueOnce(mockLogsSnapshot as any)
+
+      const result = await firebaseApi.ai.generateContactSummary('contact-1')
+
+      expect(typeof result).toBe('string')
+      expect(result.length).toBeGreaterThan(0)
     })
   })
 

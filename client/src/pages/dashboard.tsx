@@ -10,6 +10,7 @@ import { UpcomingSchedules } from "@/components/upcoming-schedules";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -499,6 +500,9 @@ export default function Dashboard() {
               <MessageSquare className="h-5 w-5" />
               Draft Message
             </DialogTitle>
+            <DialogDescription>
+              Compose and send a message to a group of contacts.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">

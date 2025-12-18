@@ -10,6 +10,13 @@ export interface Contact {
   phone: string;
   email: string;
   notes: string;
+  // AI-enhanced fields
+  timezone?: string;
+  preferredContactTimes?: string[];
+  communicationStyle?: 'professional' | 'casual' | 'formal';
+  relationship?: string;
+  lastContact?: string;
+  tags?: string[];
 }
 
 export interface Schedule {
@@ -62,4 +69,24 @@ export interface MessageRecipient {
   smsStatus: 'sent' | 'failed' | 'not_sent';
   emailStatus: 'sent' | 'failed' | 'not_sent';
   errorMessage?: string;
+}
+
+// AI-powered features types
+export interface ContactCategorization {
+  categories: string[];
+  tags: string[];
+  reasoning: string;
+}
+
+export interface CommunicationAnalysis {
+  frequency: string;
+  preferredMethod: string;
+  nextContactSuggestion: string;
+  insights: string[];
+}
+
+export interface ContactTimeSuggestion {
+  recommendedTime: string;
+  reasoning: string;
+  alternatives: string[];
 }

@@ -16,6 +16,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -358,6 +359,9 @@ export default function GroupsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Group</DialogTitle>
+            <DialogDescription>
+              Create a new group to organize your contacts.
+            </DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

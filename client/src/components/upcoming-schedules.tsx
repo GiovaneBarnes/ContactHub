@@ -8,6 +8,7 @@ import { getNextOccurrences } from '@/lib/schedule-utils';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -219,6 +220,9 @@ export function UpcomingSchedules() {
               <Edit className="h-5 w-5" />
               Edit Upcoming Message
             </DialogTitle>
+            <DialogDescription>
+              Modify the details of this scheduled message.
+            </DialogDescription>
           </DialogHeader>
 
           {selectedOccurrence && (
