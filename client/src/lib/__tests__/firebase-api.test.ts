@@ -7,6 +7,7 @@ import {
   doc,
   getDocs,
   query,
+  where,
   orderBy,
   serverTimestamp,
   Timestamp
@@ -22,6 +23,7 @@ vi.mock('firebase/firestore', () => ({
   doc: vi.fn(),
   getDocs: vi.fn(),
   query: vi.fn(() => 'mock-query'),
+  where: vi.fn(() => 'mock-where'),
   orderBy: vi.fn(() => 'mock-order'),
   serverTimestamp: vi.fn(() => 'server-timestamp'),
   Timestamp: class MockTimestamp {
@@ -76,38 +78,6 @@ const mockDoc = {
 describe('Firebase API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  describe('Auth API', () => {
-    it('should login user', async () => {
-      const result = await firebaseApi.auth.login('test@example.com', 'password')
-
-      expect(result).toEqual({
-        id: '1',
-        email: 'test@example.com',
-        name: 'Demo User'
-      })
-    })
-
-    it('should signup user', async () => {
-      const result = await firebaseApi.auth.signup('test@example.com', 'password', 'Test User')
-
-      expect(result).toEqual({
-        id: '1',
-        email: 'test@example.com',
-        name: 'Test User'
-      })
-    })
-
-    it('should get current user', async () => {
-      const result = await firebaseApi.auth.getCurrentUser()
-
-      expect(result).toEqual({
-        id: '1',
-        email: 'user@example.com',
-        name: 'Demo User'
-      })
-    })
   })
 
   describe('Contacts API', () => {

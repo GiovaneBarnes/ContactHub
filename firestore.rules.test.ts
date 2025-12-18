@@ -39,7 +39,7 @@ describe('Firestore Security Rules', () => {
   })
 
   it('should secure message logs collection', () => {
-    expect(rulesContent).toContain('match /logs/{logId}')
+    expect(rulesContent).toContain('match /messageLogs/{logId}')
     expect(rulesContent).toContain('allow read, write: if request.auth != null && resource.data.userId == request.auth.uid')
     expect(rulesContent).toContain('allow create: if request.auth != null && request.auth.uid == request.resource.data.userId')
   })

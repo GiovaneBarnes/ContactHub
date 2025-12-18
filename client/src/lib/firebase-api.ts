@@ -6,6 +6,7 @@ import {
   doc, 
   getDocs,
   query,
+  where,
   orderBy,
   serverTimestamp,
   Timestamp
@@ -27,6 +28,13 @@ const getCurrentUserId = (): string => {
     throw new Error("User not authenticated");
   }
   return user.uid;
+};
+
+// Helper to get current user ID safely (returns null if not authenticated)
+const getCurrentUserIdSafe = (): string | null => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  return user ? user.uid : null;
 };
 
 // Helper to convert Firestore doc to Contact
@@ -72,23 +80,20 @@ const docToMessageLog = (doc: any): MessageLog => {
 };
 
 export const firebaseApi = {
-  auth: {
-    login: async (email: string, password: string): Promise<User> => {
-      // For now, using mock auth - you can implement Firebase Auth later
-      return { id: '1', email, name: 'Demo User' };
-    },
-    signup: async (email: string, password: string, name: string): Promise<User> => {
-      return { id: '1', email, name };
-    },
-    getCurrentUser: async (): Promise<User | null> => {
-      return { id: '1', email: 'user@example.com', name: 'Demo User' };
-    }
-  },
+  // Auth functions are handled directly in auth-context.tsx using Firebase Auth
+  // auth: {
+  //   login: async (email: string, password: string): Promise<User> => { ... },
+  //   signup: async (email: string, password: string, name: string): Promise<User> => { ... },
+  //   getCurrentUser: async (): Promise<User | null> => { ... }
+  // },
 
   contacts: {
     list: async (): Promise<Contact[]> => {
+      const userId = getCurrentUserIdSafe();
+      if (!userId) return []; // Return empty array if not authenticated
+      
       const contactsRef = collection(db, CONTACTS_COLLECTION);
-      const q = query(contactsRef, orderBy("name"));
+      const q = query(contactsRef, where("userId", "==", userId), orderBy("name"));
       const snapshot = await getDocs(q);
       return snapshot.docs.map(docToContact);
     },
@@ -124,15 +129,20 @@ export const firebaseApi = {
 
   groups: {
     list: async (): Promise<Group[]> => {
+      const userId = getCurrentUserIdSafe();
+      if (!userId) return []; // Return empty array if not authenticated
+      
       const groupsRef = collection(db, GROUPS_COLLECTION);
-      const q = query(groupsRef, orderBy("name"));
+      const q = query(groupsRef, where("userId", "==", userId), orderBy("name"));
       const snapshot = await getDocs(q);
       return snapshot.docs.map(docToGroup);
     },
 
     get: async (id: string): Promise<Group | undefined> => {
+      const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
-      const snapshot = await getDocs(groupsRef);
+      const q = query(groupsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
       const groupDoc = snapshot.docs.find(doc => doc.id === id);
       return groupDoc ? docToGroup(groupDoc) : undefined;
     },
@@ -166,8 +176,10 @@ export const firebaseApi = {
     },
 
     updateSchedule: async (groupId: string, scheduleId: string, updates: Partial<import('./types').Schedule>): Promise<Group> => {
+      const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
-      const snapshot = await getDocs(groupsRef);
+      const q = query(groupsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
       const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
       
       if (!groupDoc) throw new Error('Group not found');
@@ -187,8 +199,10 @@ export const firebaseApi = {
     },
 
     deleteSchedule: async (groupId: string, scheduleId: string): Promise<Group> => {
+      const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
-      const snapshot = await getDocs(groupsRef);
+      const q = query(groupsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
       const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
       
       if (!groupDoc) throw new Error('Group not found');
@@ -206,8 +220,10 @@ export const firebaseApi = {
     },
 
     createSchedule: async (groupId: string, schedule: Omit<import('./types').Schedule, 'id'>): Promise<Group> => {
+      const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
-      const snapshot = await getDocs(groupsRef);
+      const q = query(groupsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
       const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
       
       if (!groupDoc) throw new Error('Group not found');
@@ -230,8 +246,11 @@ export const firebaseApi = {
 
   logs: {
     list: async (): Promise<MessageLog[]> => {
+      const userId = getCurrentUserIdSafe();
+      if (!userId) return []; // Return empty array if not authenticated
+      
       const logsRef = collection(db, LOGS_COLLECTION);
-      const q = query(logsRef, orderBy("timestamp", "desc"));
+      const q = query(logsRef, where("userId", "==", userId), orderBy("timestamp", "desc"));
       const snapshot = await getDocs(q);
       return snapshot.docs.map(docToMessageLog);
     }
@@ -242,8 +261,10 @@ export const firebaseApi = {
       // Simulate AI processing - you can integrate with OpenAI or other services later
       await new Promise(resolve => setTimeout(resolve, 1500));
       
+      const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
-      const snapshot = await getDocs(groupsRef);
+      const q = query(groupsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
       const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
       
       if (!groupDoc) throw new Error('Group not found');
@@ -265,7 +286,8 @@ export const firebaseApi = {
       
       const userId = getCurrentUserId();
       const groupsRef = collection(db, GROUPS_COLLECTION);
-      const snapshot = await getDocs(groupsRef);
+      const q = query(groupsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
       const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
       
       if (!groupDoc) throw new Error('Group not found');

@@ -60,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Production Security**: CSP headers, rate limiting, and Firebase-specific security measures
 
 ### Changed
+- **Authentication Architecture**: Moved authentication functions from `firebase-api.ts` to dedicated `auth-context.tsx` for better separation of concerns and cleaner API design
+- **Firestore Collection Naming**: Updated message logs collection from `logs` to `messageLogs` for clearer naming convention and consistency
+- **Test Suite Optimization**: Streamlined Firebase API tests by removing redundant authentication tests now handled in auth context tests
 - Updated Group interface to use `schedules` array instead of single `schedule`
 - Enhanced mock data with realistic scheduling examples
 - Improved group creation and editing workflows
@@ -74,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security Configuration**: Added environment-based security settings with development/production modes
 
 ### Fixed
+- **Authentication Architecture Refactoring**: Moved authentication functions from Firebase API to dedicated auth context for better separation of concerns and cleaner architecture
+- **Firestore Collection Naming**: Updated security rules and tests to use consistent `messageLogs` collection naming instead of `logs`
+- **Test Suite Optimization**: Removed redundant authentication tests from Firebase API tests since they're now properly covered in auth context tests
 - **TypeScript Errors in Auth Tests**: Resolved 8 TypeScript compilation errors in `auth-context.test.tsx` related to improper mocking of Firebase's `onAuthStateChanged` callback function
 - **Unhandled Promise Rejections**: Fixed 2 unhandled promise rejections in authentication failure tests by properly catching async errors in test component handlers
 - **Test Suite Stability**: Ensured all 107 tests pass consistently with no unhandled errors or warnings
