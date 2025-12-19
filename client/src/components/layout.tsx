@@ -6,19 +6,46 @@ import {
   Layers, 
   History, 
   LogOut, 
+  LogIn,
   Menu,
   BarChart3,
-  Sparkles
+  Sparkles,
+  HelpCircle,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
+
+// Lazy load heavy AI components to avoid initialization issues
+const AIFeaturesBanner = lazy(() => import("@/components/ai-feature-tour").then(m => ({ default: m.AIFeaturesBanner })));
+const AIFeatureTour = lazy(() => import("@/components/ai-feature-tour").then(m => ({ default: m.AIFeatureTour })));
+
+// Create a simple hook wrapper that doesn't trigger component loading
+function useAIFeatureTour() {
+  const [isOpen, setIsOpen] = useState(false);
+  const startTour = () => setIsOpen(true);
+  const TourComponent = isOpen ? (
+    <Suspense fallback={null}>
+      <AIFeatureTour forceOpen={isOpen} onComplete={() => setIsOpen(false)} />
+    </Suspense>
+  ) : null;
+  return { startTour, TourComponent };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { startTour, TourComponent } = useAIFeatureTour();
 
   // Admin access control
   const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(',').map((email: string) => email.trim()) || [];
@@ -84,26 +111,59 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
               <ThemeToggle />
             </div>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-10 hover-glow"
-              onClick={logout}
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
+            <div className="space-y-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3 h-10"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                    Help & AI Tour
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={startTour} className="gap-3">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <div>
+                      <div className="font-medium">AI Features Tour</div>
+                      <div className="text-xs text-muted-foreground">Learn about AI capabilities</div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Link href="/settings">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-10"
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Button>
+              </Link>
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-10 hover-glow"
+                  onClick={logout}
+                >
+                  <LogIn className="h-4 w-4 rotate-180" />
+                  Logout
+                </Button>
+              </div>
+            </div>
           </>
         ) : (
           <div className="space-y-3">
             <ThemeToggle />
-            <div className="text-center text-sm text-muted-foreground">
-              <Link href="/auth?mode=login">
-                <Button variant="outline" className="w-full justify-start gap-3 h-10 hover-glow">
-                  <LogOut className="h-4 w-4 rotate-180" />
-                  Sign In
-                </Button>
-              </Link>
-            </div>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-3 h-10 hover-glow"
+              onClick={() => setLocation('/auth?mode=login')}
+            >
+              <LogIn className="h-4 w-4" />
+              Sign In
+            </Button>
           </div>
         )}
       </div>
@@ -111,41 +171,53 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block w-64 shrink-0">
-        <NavContent />
-      </div>
-
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 glass border-b border-border/50 z-50 flex items-center px-4 justify-between backdrop-blur-xl">
-        <Link href="/">
-          <h1 className="text-lg font-bold font-display text-gradient hover:text-primary/80 transition-colors cursor-pointer">
-            ContactHub
-          </h1>
-        </Link>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="hover-glow">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 glass">
-              <NavContent />
-            </SheetContent>
-          </Sheet>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* AI Features Banner - shown only for logged-in users */}
+      {user && (
+        <Suspense fallback={null}>
+          <AIFeaturesBanner />
+        </Suspense>
+      )}
+      
+      <div className="flex flex-1">
+        {/* Desktop Sidebar */}
+        <div className="hidden md:block w-64 shrink-0">
+          <NavContent />
         </div>
-      </div>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto md:h-screen pt-16 md:pt-0 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20 -z-10" />
-        <div className="container mx-auto max-w-6xl p-6 md:p-8 relative">
-          {children}
+        {/* Mobile Header */}
+        <div className="md:hidden fixed top-0 left-0 right-0 h-16 glass border-b border-border/50 z-50 flex items-center px-4 justify-between backdrop-blur-xl">
+          <Link href="/">
+            <h1 className="text-lg font-bold font-display text-gradient hover:text-primary/80 transition-colors cursor-pointer">
+              ContactHub
+            </h1>
+          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover-glow">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64 glass">
+                <NavContent />
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
-      </main>
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto md:h-screen pt-16 md:pt-0 relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20 -z-10" />
+          <div className="container mx-auto max-w-6xl p-6 md:p-8 relative">
+            {children}
+          </div>
+        </main>
+      </div>
+      
+      {/* Tour Component */}
+      {TourComponent}
     </div>
   );
 }

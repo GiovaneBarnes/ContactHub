@@ -53,13 +53,16 @@ export default function GroupDetailPage() {
 
   const updateGroupMutation = useMutation({
     mutationFn: (data: any) => firebaseApi.groups.update(id!, data),
-    onSuccess: (updatedGroup) => {
-      // Update the individual group cache
-      queryClient.setQueryData(['group', id], updatedGroup);
-      // Update the groups list cache
+    onSuccess: (updatedData) => {
+      // Update the individual group cache by merging with existing data
+      queryClient.setQueryData(['group', id], (oldGroup: Group | undefined) => {
+        if (!oldGroup) return oldGroup;
+        return { ...oldGroup, ...updatedData };
+      });
+      // Update the groups list cache by merging with existing data
       queryClient.setQueryData(['groups'], (oldGroups: Group[] | undefined) => {
         if (!oldGroups) return oldGroups;
-        return oldGroups.map(g => g.id === id ? updatedGroup : g);
+        return oldGroups.map(g => g.id === id ? { ...g, ...updatedData } : g);
       });
       toast({ title: "Group updated" });
     }
@@ -70,10 +73,15 @@ export default function GroupDetailPage() {
     onSuccess: (message) => {
       setGeneratedMessage(message);
       toast({ title: "Message generated", description: "You can edit it before sending." });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Failed to generate message", 
+        description: error.message || "Please try again or check your group settings.",
+        variant: "destructive"
+      });
     }
-  });
-
-  const sendMutation = useMutation({
+  });  const sendMutation = useMutation({
     mutationFn: () => firebaseApi.messaging.send(id!, generatedMessage, ['sms', 'email']),
     onSuccess: () => {
       setGeneratedMessage("");
@@ -82,10 +90,6 @@ export default function GroupDetailPage() {
       toast({ title: "Message sent!", description: "Check logs for delivery status." });
     },
     onError: (error) => {
-      console.error('🔴 UI Error Handler: Message send failed');
-      console.error('🔴 Error object:', error);
-      console.error('🔴 Error message:', error.message);
-      console.error('🔴 Error stack:', error.stack);
       toast({ 
         title: "Failed to send message", 
         description: error.message || "Please try again or check your group settings.",

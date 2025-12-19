@@ -362,17 +362,15 @@ describe('AuthProvider', () => {
 
   it('should provide default context when used outside provider', () => {
     // This test verifies the error handling in useAuth
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
     const BadComponent = () => {
       const auth = useAuth()
       return <div>{auth.isLoading ? 'loading' : 'loaded'}</div>
     }
 
+    // Should not throw when used outside provider
     expect(() => render(<BadComponent />)).not.toThrow()
-
-    expect(consoleSpy).toHaveBeenCalledWith('useAuth must be used within AuthProvider - context is undefined')
-
-    consoleSpy.mockRestore()
+    
+    // Should render loading state from default context
+    expect(screen.getByText('loading')).toBeInTheDocument()
   })
 })

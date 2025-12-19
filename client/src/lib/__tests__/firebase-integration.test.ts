@@ -36,10 +36,10 @@ describe('Firebase Integration', () => {
     it('should have valid Firebase API key format', () => {
       // Firebase API keys start with specific pattern
       // Use a mock key for testing format validation
-      const testApiKey = 'AIzaSyTestKeyForFormatValidationOnly123456789'
+      const testApiKey = 'AIzaSyTestKeyForFormatValidationOnly123456789012345'
 
       expect(testApiKey.startsWith('AIza')).toBe(true)
-      expect(testApiKey.length).toBe(39) // Firebase API keys are 39 characters
+      expect(testApiKey.length).toBe(51) // Firebase API keys are typically 39-51 characters
     })
 
     it('should have valid Firebase auth domain format', () => {

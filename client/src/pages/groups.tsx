@@ -32,9 +32,10 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Users, ArrowRight, Loader2, Trash2, Edit3, CheckSquare, Square, X, Settings } from "lucide-react";
+import { Plus, Users, ArrowRight, Loader2, Trash2, Edit3, CheckSquare, Square, X, Settings, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { SmartGroupSuggestions } from "@/components/smart-group-suggestions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +58,7 @@ export default function GroupsPage() {
   const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -195,6 +197,17 @@ export default function GroupsPage() {
           <p className="text-muted-foreground text-sm sm:text-base">Organize contacts and automate messages</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {!showSmartSuggestions && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSmartSuggestions(true)}
+              className="w-full sm:w-auto gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Smart Suggestions
+            </Button>
+          )}
           {isSelectionMode ? (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedGroups.size === 0} className="flex-1 sm:flex-none">
@@ -221,6 +234,24 @@ export default function GroupsPage() {
           )}
         </div>
       </div>
+
+      {/* Smart Group Suggestions Section */}
+      {showSmartSuggestions && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">AI-Powered Group Suggestions</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSmartSuggestions(false)}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Close
+            </Button>
+          </div>
+          <SmartGroupSuggestions autoLoad={true} />
+        </div>
+      )}
 
       {/* Bulk Actions Bar */}
       {selectedGroups.size > 0 && (
@@ -376,6 +407,9 @@ export default function GroupsPage() {
                   <FormItem>
                     <FormLabel>Group Name</FormLabel>
                     <FormControl><Input placeholder="e.g. Marketing Team" {...field} /></FormControl>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
+                      ⚠️ Note: Group names may appear in email communications
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

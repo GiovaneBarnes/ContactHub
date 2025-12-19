@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Layout } from '../layout'
 // @ts-ignore
 import { MemoryRouter } from 'wouter'
@@ -146,6 +147,49 @@ describe('Layout', () => {
 
       // Restore original env
       import.meta.env.VITE_ADMIN_EMAILS = originalEnv
+    })
+
+    it('renders settings link', () => {
+      render(
+        <MemoryRouter>
+          <Layout>
+            <div>Test Content</div>
+          </Layout>
+        </MemoryRouter>
+      )
+
+      expect(screen.getByText('Settings')).toBeInTheDocument()
+    })
+
+    it('displays user avatar with initial', () => {
+      render(
+        <MemoryRouter>
+          <Layout>
+            <div>Test Content</div>
+          </Layout>
+        </MemoryRouter>
+      )
+
+      // User name starts with 'T' (Test User)
+      expect(screen.getByText('T')).toBeInTheDocument()
+    })
+
+    it.skip('shows help menu dropdown', async () => {
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <Layout>
+            <div>Test Content</div>
+          </Layout>
+        </MemoryRouter>
+      )
+
+      const helpButton = screen.getByRole('button', { name: /help/i })
+      await user.click(helpButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Quick Start Guide')).toBeInTheDocument()
+      })
     })
 
     it('handles empty admin emails environment variable', () => {

@@ -91,18 +91,13 @@ describe('MetricsService', () => {
 
     it('handles Firebase Analytics errors gracefully', async () => {
       const { logEvent } = await import('firebase/analytics')
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
       ;(logEvent as any).mockImplementation(() => {
         throw new Error('Firebase Analytics error')
       })
 
-      // Should not throw despite Firebase Analytics error
+      // Should not throw despite Firebase Analytics error - fails silently
       await expect(metricsService.trackEvent('user', 'test', {})).resolves.not.toThrow()
-
-      expect(consoleSpy).toHaveBeenCalledWith('❌ Firebase Analytics tracking failed:', expect.any(Object))
-
-      consoleSpy.mockRestore()
     })
   })
 
@@ -341,7 +336,8 @@ describe('MetricsService', () => {
         loginCount: 0,
         lastActive: expect.any(Date),
         sessionDuration: 0,
-        featureUsage: {}
+        featureUsage: {},
+        emailCount: 0
       })
     })
   })

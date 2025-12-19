@@ -12,8 +12,8 @@ import {
   Timestamp
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getFunctions } from "firebase/functions";
-import { db } from "./firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "./firebase";
 import { Contact, Group, MessageLog, User } from "./types";
 import ContactHubAI from './contact-hub-ai';
 import { metricsService } from './metrics';
@@ -54,13 +54,25 @@ const cleanFirestoreData = (data: any): any => {
 // Helper to convert Firestore doc to Contact
 const docToContact = (doc: any): Contact => {
   const data = doc.data();
-  return {
+  const contact = {
     id: doc.id,
     name: data.name,
     phone: data.phone,
     email: data.email,
-    notes: data.notes || ""
+    notes: data.notes || "",
+    // AI-enhanced fields
+    timezone: data.timezone,
+    preferredContactTimes: data.preferredContactTimes,
+    communicationStyle: data.communicationStyle,
+    relationship: data.relationship,
+    lastContact: data.lastContact,
+    tags: data.tags,
+    // AI-generated categorization
+    aiCategories: data.aiCategories,
+    aiTags: data.aiTags,
+    aiCategorizedAt: data.aiCategorizedAt
   };
+  return contact;
 };
 
 // Helper to convert Firestore doc to Group
@@ -152,6 +164,38 @@ export const firebaseApi = {
       const docRef = doc(db, CONTACTS_COLLECTION, id);
       await deleteDoc(docRef);
       await metricsService.trackContactAction('delete', { contactId: id });
+    },
+
+    // New AI-powered features
+    categorizeContact: async (contactId: string): Promise<{
+      categories: string[];
+      tags: string[];
+      reasoning: string;
+    }> => {
+      const userId = getCurrentUserId();
+      
+      const contactDoc = await getDocs(query(
+        collection(db, CONTACTS_COLLECTION),
+        where("userId", "==", userId)
+      ));
+      const contact = contactDoc.docs.find(doc => doc.id === contactId);
+
+      if (!contact) {
+        throw new Error('Contact not found');
+      }
+
+      const contactData = docToContact(contact);
+      
+      const result = await ContactHubAI.categorizeContact(
+        contactData.name,
+        contactData.email,
+        contactData.phone,
+        contactData.notes,
+        contactData.tags,
+        contactId
+      );
+      
+      return result;
     }
   },
 
@@ -272,6 +316,29 @@ export const firebaseApi = {
     }
   },
 
+  smartGroups: {
+    suggestGroups: async (): Promise<{
+      suggestedGroups: Array<{
+        name: string;
+        purpose: string;
+        contacts: string[];
+        contactIds: string[];
+        contactCount: number;
+        rationale: string;
+      }>;
+      insights: string;
+    }> => {
+      const userId = getCurrentUserId();
+      
+      try {
+        const result = await httpsCallable(functions, 'suggestSmartGroups')({});
+        return result.data as any;
+      } catch (error) {
+        throw error;
+      }
+    }
+  },
+
   logs: {
     list: async (): Promise<MessageLog[]> => {
       const userId = getCurrentUserIdSafe();
@@ -316,34 +383,10 @@ export const firebaseApi = {
         group.name,
         group.backgroundInfo || 'General group communication',
         contactCount,
-        lastContactDate
+        lastContactDate,
+        groupId
       );
-    },
-
-    // New AI-powered features
-    categorizeContact: async (contactId: string): Promise<{
-      categories: string[];
-      tags: string[];
-      reasoning: string;
-    }> => {
-      const userId = getCurrentUserId();
-      const contactDoc = await getDocs(query(
-        collection(db, CONTACTS_COLLECTION),
-        where("userId", "==", userId)
-      ));
-      const contact = contactDoc.docs.find(doc => doc.id === contactId);
-
-      if (!contact) throw new Error('Contact not found');
-
-      const contactData = docToContact(contact);
-      return await ContactHubAI.categorizeContact(
-        contactData.name,
-        contactData.email,
-        contactData.phone,
-        contactData.notes,
-        contactData.tags
-      );
-    },
+    }, // <-- Missing comma here
 
     analyzeCommunicationPatterns: async (contactId: string): Promise<{
       frequency: string;
@@ -353,34 +396,46 @@ export const firebaseApi = {
     }> => {
       const userId = getCurrentUserId();
 
-      // Get contact details
-      const contactDoc = await getDocs(query(
-        collection(db, CONTACTS_COLLECTION),
-        where("userId", "==", userId)
-      ));
-      const contact = contactDoc.docs.find(doc => doc.id === contactId);
+      try {
+        // Get contact details
+        const contactDoc = await getDocs(query(
+          collection(db, CONTACTS_COLLECTION),
+          where("userId", "==", userId)
+        ));
+        const contact = contactDoc.docs.find(doc => doc.id === contactId);
 
-      if (!contact) throw new Error('Contact not found');
+        if (!contact) {
+          throw new Error('Contact not found');
+        }
 
-      const contactData = docToContact(contact);
+        const contactData = docToContact(contact);
 
-      // Get communication history
-      const logsRef = collection(db, LOGS_COLLECTION);
-      const logsQuery = query(
-        logsRef,
-        where("userId", "==", userId),
-        where("contactId", "==", contactId),
-        orderBy("timestamp", "desc")
-      );
-      const logsSnapshot = await getDocs(logsQuery);
-      const messageLogs = logsSnapshot.docs.map(docToMessageLog);
+        // Get communication history
+        const logsRef = collection(db, LOGS_COLLECTION);
+        const logsQuery = query(
+          logsRef,
+          where("userId", "==", userId),
+          orderBy("timestamp", "desc")
+        );
+        const logsSnapshot = await getDocs(logsQuery);
+        
+        // Filter logs that include this contact in recipientDetails
+        const allLogs = logsSnapshot.docs.map(docToMessageLog);
+        const messageLogs = allLogs.filter(log => 
+          log.recipientDetails?.some(recipient => recipient.contactId === contactId)
+        );
 
-      return await ContactHubAI.analyzeCommunicationPatterns(
-        contactData.name,
-        messageLogs,
-        contactData.lastContact || 'Unknown',
-        contactData.relationship || 'professional'
-      );
+        const result = await ContactHubAI.analyzeCommunicationPatterns(
+          contactId,
+          contactData.name,
+          messageLogs,
+          contactData.lastContact || 'Unknown',
+          contactData.relationship || 'professional'
+        );
+        return result;
+      } catch (error) {
+        throw error;
+      }
     },
 
     suggestContactTime: async (contactId: string): Promise<{
@@ -389,70 +444,93 @@ export const firebaseApi = {
       alternatives: string[];
     }> => {
       const userId = getCurrentUserId();
-      const contactDoc = await getDocs(query(
-        collection(db, CONTACTS_COLLECTION),
-        where("userId", "==", userId)
-      ));
-      const contact = contactDoc.docs.find(doc => doc.id === contactId);
 
-      if (!contact) throw new Error('Contact not found');
+      try {
+        const contactDoc = await getDocs(query(
+          collection(db, CONTACTS_COLLECTION),
+          where("userId", "==", userId)
+        ));
+        const contact = contactDoc.docs.find(doc => doc.id === contactId);
 
-      const contactData = docToContact(contact);
+        if (!contact) {
+          throw new Error('Contact not found');
+        }
 
-      // Get communication patterns from logs
-      const logsRef = collection(db, LOGS_COLLECTION);
-      const logsQuery = query(
-        logsRef,
-        where("userId", "==", userId),
-        where("contactId", "==", contactId),
-        orderBy("timestamp", "desc")
-      );
-      const logsSnapshot = await getDocs(logsQuery);
-      const responsePatterns = logsSnapshot.docs.slice(0, 10).map(doc => {
-        const data = doc.data();
-        return data.timestamp.toDate().toISOString();
-      });
+        const contactData = docToContact(contact);
 
-      return await ContactHubAI.suggestContactTime(
-        contactData.name,
-        contactData.timezone || 'UTC',
-        contactData.preferredContactTimes,
-        contactData.communicationStyle || 'professional',
-        contactData.lastContact,
-        responsePatterns
-      );
+        // Get communication patterns from logs
+        const logsRef = collection(db, LOGS_COLLECTION);
+        const logsQuery = query(
+          logsRef,
+          where("userId", "==", userId),
+          orderBy("timestamp", "desc")
+        );
+        const logsSnapshot = await getDocs(logsQuery);
+        
+        // Filter and extract timestamps for this contact
+        const allLogs = logsSnapshot.docs.map(docToMessageLog);
+        const contactLogs = allLogs.filter(log => 
+          log.recipientDetails?.some(recipient => recipient.contactId === contactId)
+        );
+        const responsePatterns = contactLogs.slice(0, 10).map(log => log.timestamp);
+
+        const result = await ContactHubAI.suggestContactTime(
+          contactId,
+          contactData.name,
+          contactData.timezone || 'UTC',
+          contactData.preferredContactTimes,
+          contactData.communicationStyle || 'professional',
+          contactData.lastContact,
+          responsePatterns
+        );
+        return result;
+      } catch (error) {
+        throw error;
+      }
     },
 
     generateContactSummary: async (contactId: string): Promise<string> => {
       const userId = getCurrentUserId();
 
-      // Get contact details
-      const contactDoc = await getDocs(query(
-        collection(db, CONTACTS_COLLECTION),
-        where("userId", "==", userId)
-      ));
-      const contact = contactDoc.docs.find(doc => doc.id === contactId);
+      try {
+        // Get contact details
+        const contactDoc = await getDocs(query(
+          collection(db, CONTACTS_COLLECTION),
+          where("userId", "==", userId)
+        ));
+        const contact = contactDoc.docs.find(doc => doc.id === contactId);
 
-      if (!contact) throw new Error('Contact not found');
+        if (!contact) {
+          throw new Error('Contact not found');
+        }
 
-      const contactData = docToContact(contact);
+        const contactData = docToContact(contact);
 
-      // Get recent interactions
-      const logsRef = collection(db, LOGS_COLLECTION);
-      const logsQuery = query(
-        logsRef,
-        where("userId", "==", userId),
-        where("contactId", "==", contactId),
-        orderBy("timestamp", "desc")
-      );
-      const logsSnapshot = await getDocs(logsQuery);
-      const interactions = logsSnapshot.docs.slice(0, 10).map(doc => ({
-        date: doc.data().timestamp.toDate().toISOString(),
-        type: doc.data().type,
-        content: doc.data().content
-      }));
+        // Get recent interactions
+        const logsRef = collection(db, LOGS_COLLECTION);
+        const logsQuery = query(
+          logsRef,
+          where("userId", "==", userId),
+          orderBy("timestamp", "desc")
+        );
+        const logsSnapshot = await getDocs(logsQuery);
+        
+        // Filter logs for this contact and extract interactions
+        const allLogs = logsSnapshot.docs.map(docToMessageLog);
+        const contactLogs = allLogs.filter(log => 
+          log.recipientDetails?.some(recipient => recipient.contactId === contactId)
+        );
+        const interactions = contactLogs.slice(0, 10).map(log => ({
+          date: log.timestamp,
+          type: log.deliveryMethod,
+          content: `Message sent to ${log.groupName || 'group'} - ${log.status}`
+        }));
 
-      return await ContactHubAI.generateContactSummary(contactData, interactions);
+        const result = await ContactHubAI.generateContactSummary(contactData, interactions);
+        return result;
+      } catch (error) {
+        throw error;
+      }
     }
   },
 
@@ -463,11 +541,9 @@ export const firebaseApi = {
       try {
         // Validate input
         if (!content || content.trim().length === 0) {
-          console.error('❌ Validation failed: Empty message content');
           throw new Error('Message content cannot be empty');
         }
         if (!channels || channels.length === 0) {
-          console.error('❌ Validation failed: No channels specified');
           throw new Error('At least one delivery channel must be selected');
         }
 
@@ -483,7 +559,6 @@ export const firebaseApi = {
         const userId = getCurrentUserId();
 
         if (!userId) {
-          console.error('❌ No authenticated user found');
           throw new Error('User not authenticated');
         }
 
@@ -494,7 +569,6 @@ export const firebaseApi = {
         const groupDoc = snapshot.docs.find(doc => doc.id === groupId);
 
         if (!groupDoc) {
-          console.error('❌ Group not found:', groupId);
           throw new Error('Group not found');
         }
 
@@ -502,7 +576,6 @@ export const firebaseApi = {
 
         // Validate group has contacts
         if (!group.contactIds || group.contactIds.length === 0) {
-          console.error('❌ Group has no members');
           throw new Error('Cannot send message: group has no members');
         }
 
@@ -516,7 +589,6 @@ export const firebaseApi = {
         const groupContacts = allContacts.filter(contact => group.contactIds.includes(contact.id));
 
         if (groupContacts.length === 0) {
-          console.error('❌ No valid contacts found in group after filtering');
           throw new Error('Cannot send message: no valid contacts found in group');
         }
 
@@ -528,11 +600,9 @@ export const firebaseApi = {
         const requestingSms = channels.includes('sms');
 
         if (requestingEmail && !hasValidEmailContacts) {
-          console.error('❌ Email validation failed: no valid email contacts in group');
           throw new Error('Cannot send email: no group members have valid email addresses');
         }
         if (requestingSms && !hasValidSmsContacts) {
-          console.error('❌ SMS validation failed: no valid SMS contacts in group');
           throw new Error('Cannot send SMS: no group members have valid phone numbers');
         }
 
@@ -589,7 +659,6 @@ export const firebaseApi = {
                 recipientDetail.emailStatus = 'sent';
                 successCount++;
               } catch (error) {
-                console.error(`❌ Failed to send email to ${contact.name}:`, error);
                 recipientDetail.emailStatus = 'failed';
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                 recipientDetail.errorMessage = `Email failed: ${errorMessage}`;
@@ -621,7 +690,6 @@ export const firebaseApi = {
                 recipientDetail.smsStatus = 'sent';
                 successCount++;
               } catch (error) {
-                console.error(`❌ Failed to send SMS to ${contact.name}:`, error);
                 recipientDetail.smsStatus = 'failed';
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                 if (recipientDetail.errorMessage) {
@@ -636,7 +704,6 @@ export const firebaseApi = {
             recipientDetails.push(recipientDetail);
           }
         } catch (loopError) {
-          console.error('💥 Unexpected error in sending loop:', loopError);
           throw loopError;
         }
 
@@ -667,6 +734,21 @@ export const firebaseApi = {
           status: successCount > 0 ? 'sent' : 'failed'
         }));
 
+        // Update lastContact field for each contact that was successfully messaged
+        const currentTimestamp = new Date().toISOString();
+        for (const recipient of cleanedRecipientDetails) {
+          if (recipient.smsStatus === 'sent' || recipient.emailStatus === 'sent') {
+            try {
+              const contactDocRef = doc(db, CONTACTS_COLLECTION, recipient.contactId);
+              await updateDoc(contactDocRef, {
+                lastContact: currentTimestamp,
+                updatedAt: serverTimestamp()
+              });
+            } catch (error) {
+            }
+          }
+        }
+
         await metricsService.trackMessageAction('send', {
           groupId,
           groupName: group.name,
@@ -677,7 +759,6 @@ export const firebaseApi = {
         });
 
       } catch (error) {
-        console.error('💥 Message send failed with error:', error);
         throw error;
       }
     }

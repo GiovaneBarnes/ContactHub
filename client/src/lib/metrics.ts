@@ -87,7 +87,6 @@ class MetricsService {
           firestoreSuccess = true;
         } catch (firestoreError) {
           const errorMessage = firestoreError instanceof Error ? firestoreError.message : 'Unknown error';
-          console.warn('Firestore analytics storage failed:', errorMessage);
         }
       }
 
@@ -100,32 +99,14 @@ class MetricsService {
             session_id: this.sessionId,
             user_id: this.userId
           });
-          console.log(`📊 Firebase Analytics event sent: ${event.eventType}${firestoreSuccess ? ' (with Firestore)' : ' (Firebase Analytics only)'}`);
         } catch (analyticsError) {
-          const errorMessage = analyticsError instanceof Error ? analyticsError.message : 'Unknown error';
-          console.error('❌ Firebase Analytics tracking failed:', {
-            error: errorMessage,
-            eventType: event.eventType,
-            hasAnalytics: !!analytics,
-            firestoreWorked: firestoreSuccess
-          });
+          // Analytics failed but Firestore succeeded - continue silently
           // Don't throw - analytics failures shouldn't break the app
         }
-      } else {
-        console.log(`📊 Analytics not available, only Firestore stored: ${firestoreSuccess ? 'success' : 'failed'}`);
       }
 
-      console.log(`📊 Tracked: ${category}_${action}`, properties);
     } catch (error) {
-      // Handle different types of analytics errors
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (errorMessage.includes('permission-denied') || errorMessage.includes('Missing or insufficient permissions')) {
-        console.warn('Analytics tracking failed: Firestore permissions issue - custom analytics events disabled, but Firebase Analytics may still work');
-      } else if (errorMessage.includes('network') || errorMessage.includes('blocked')) {
-        console.warn('Analytics tracking failed: Network/CSP blocking - check Content Security Policy');
-      } else {
-        console.warn('Analytics tracking failed:', errorMessage);
-      }
+      // Analytics tracking failed - continue silently to not break the app
     }
   }
 
@@ -180,48 +161,67 @@ class MetricsService {
 
   // Analytics queries
   async getUserMetrics(userId: string, days: number = 30): Promise<UserMetrics> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    try {
 
-    const eventsQuery = query(
-      collection(db, 'analytics_events'),
-      where('userId', '==', userId),
-      where('timestamp', '>=', Timestamp.fromDate(startDate)),
-      orderBy('timestamp', 'desc')
-    );
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
-    const events = await getDocs(eventsQuery);
-    const eventData = events.docs.map(doc => {
-      const data = doc.data() as any;
-      return {
-        ...data,
-        timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : data.timestamp
+      const eventsQuery = query(
+        collection(db, 'analytics_events'),
+        where('userId', '==', userId),
+        where('timestamp', '>=', Timestamp.fromDate(startDate)),
+        orderBy('timestamp', 'desc')
+      );
+
+      const events = await getDocs(eventsQuery);
+      const eventData = events.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          ...data,
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : data.timestamp
+        };
+      }) as MetricEvent[];
+
+
+      // Calculate metrics
+      const metrics: UserMetrics = {
+        totalContacts: eventData.filter(e => e.category === 'contact' && e.action === 'create').length,
+        totalGroups: eventData.filter(e => e.category === 'group' && e.action === 'create').length,
+        messagesSent: eventData.filter(e => e.category === 'message' && e.action === 'send').length,
+        aiRequests: eventData.filter(e => e.category === 'ai').length,
+        loginCount: eventData.filter(e => e.category === 'user' && e.action === 'login').length,
+        lastActive: eventData[0]?.timestamp || new Date(),
+        sessionDuration: 0, // Calculate from session events
+        featureUsage: {},
+        emailCount: eventData.filter(e => e.category === 'message' && e.action === 'send' && e.properties?.channels?.includes('email')).length
       };
-    }) as MetricEvent[];
 
-    // Calculate metrics
-    const metrics: UserMetrics = {
-      totalContacts: eventData.filter(e => e.category === 'contact' && e.action === 'create').length,
-      totalGroups: eventData.filter(e => e.category === 'group' && e.action === 'create').length,
-      messagesSent: eventData.filter(e => e.category === 'message' && e.action === 'send').length,
-      aiRequests: eventData.filter(e => e.category === 'ai').length,
-      loginCount: eventData.filter(e => e.category === 'user' && e.action === 'login').length,
-      lastActive: eventData[0]?.timestamp || new Date(),
-      sessionDuration: 0, // Calculate from session events
-      featureUsage: {}
-    };
-
-    // Calculate feature usage
-    eventData.forEach(event => {
-      if (event.category === 'user' && event.action === 'feature_use') {
-        const feature = event.properties?.feature;
-        if (feature) {
-          metrics.featureUsage[feature] = (metrics.featureUsage[feature] || 0) + 1;
+      // Calculate feature usage
+      eventData.forEach(event => {
+        if (event.category === 'user' && event.action === 'feature_use') {
+          const feature = event.properties?.feature;
+          if (feature) {
+            metrics.featureUsage[feature] = (metrics.featureUsage[feature] || 0) + 1;
+          }
         }
-      }
-    });
+      });
 
-    return metrics;
+      return metrics;
+
+    } catch (error) {
+      // Return default metrics if we can't fetch analytics
+      return {
+        totalContacts: 0,
+        totalGroups: 0,
+        messagesSent: 0,
+        aiRequests: 0,
+        loginCount: 1, // At least 1 since they're logged in now
+        lastActive: new Date(),
+        sessionDuration: 0,
+        featureUsage: {},
+        emailCount: 0
+      };
+    }
   }
 
   // Prediction engine
