@@ -6,6 +6,7 @@ import { getAuth } from "firebase/auth";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -33,7 +34,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, Trash2, Edit, Phone, Mail, StickyNote, Loader2, CheckSquare, Square, X, Upload, Download } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Phone, Mail, StickyNote, Loader2, CheckSquare, Square, X, Upload, Download, Sparkles, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -45,6 +46,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import ContactInsightsDrawer from "@/components/contact-insights-drawer";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -64,6 +66,8 @@ export default function ContactsPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
   const [importProgress, setImportProgress] = useState(0);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [insightsContact, setInsightsContact] = useState<Contact | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -79,10 +83,13 @@ export default function ContactsPage() {
 
   const { user } = useAuth();
 
-  const { data: contacts, isLoading } = useQuery({ 
-    queryKey: ['contacts', user?.id], 
-    queryFn: firebaseApi.contacts.list,
-    enabled: !!user 
+  const { data: contacts, isLoading } = useQuery({
+    queryKey: ['contacts', user?.id],
+    queryFn: async () => {
+      const result = await firebaseApi.contacts.list();
+      return result;
+    },
+    enabled: !!user
   });
 
   const createMutation = useMutation({
@@ -132,12 +139,10 @@ export default function ContactsPage() {
       for (let i = 0; i < contacts.length; i++) {
         const contact = contacts[i];
         try {
-          console.log(`Importing contact ${i + 1}/${contacts.length}:`, contact);
           const createdContact = await firebaseApi.contacts.create(contact);
           results.push({ success: true, contact: createdContact });
           setImportProgress((i + 1) / contacts.length * 100);
         } catch (error) {
-          console.error(`Failed to import contact ${i + 1}:`, contact, error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           results.push({ success: false, contact, error: errorMessage });
         }
@@ -318,6 +323,11 @@ export default function ContactsPage() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const openInsights = (contact: Contact) => {
+    setInsightsContact(contact);
+    setIsInsightsOpen(true);
   };
 
   const parseVCF = (vcfText: string) => {
@@ -630,8 +640,39 @@ END:VCARD`;
                     {contact.notes}
                   </TableCell>
                   <TableCell className="text-right">
+                    {contact.email && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.location.href = `mailto:${contact.email}`}
+                        className="interactive-button hover:text-blue-500"
+                        title="Send email"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {contact.phone && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.location.href = `tel:${contact.phone}`}
+                        className="interactive-button hover:text-green-500"
+                        title="Call contact"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" onClick={() => openEdit(contact)} className="interactive-button hover:text-primary">
                       <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openInsights(contact)}
+                      className="interactive-button hover:text-sky-400"
+                      title="Open AI insights"
+                    >
+                      <Brain className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive interactive-button" onClick={() => openDeleteDialog(contact.id)}>
                       <Trash2 className="h-4 w-4" />
@@ -694,8 +735,11 @@ END:VCARD`;
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notes (Optional)</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormLabel>Notes (Optional but Recommended)</FormLabel>
+                    <FormControl><Input {...field} placeholder="Add context to help AI personalize messages..." /></FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      💡 Notes help AI generate better personalized messages
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -850,6 +894,17 @@ END:VCARD`;
           </div>
         </DialogContent>
       </Dialog>
+
+      <ContactInsightsDrawer
+        contact={insightsContact}
+        open={isInsightsOpen && !!insightsContact}
+        onOpenChange={(open) => {
+          setIsInsightsOpen(open);
+          if (!open) {
+            setInsightsContact(null);
+          }
+        }}
+      />
     </div>
   );
 }

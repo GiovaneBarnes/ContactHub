@@ -2,6 +2,10 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  preferences?: {
+    hasCompletedOnboarding?: boolean;
+    onboardingCompletedAt?: string;
+  };
 }
 
 export interface Contact {
@@ -17,6 +21,10 @@ export interface Contact {
   relationship?: string;
   lastContact?: string;
   tags?: string[];
+  // AI-generated categorization
+  aiCategories?: string[];
+  aiTags?: string[];
+  aiCategorizedAt?: string;
 }
 
 export interface Schedule {
