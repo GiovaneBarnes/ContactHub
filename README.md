@@ -149,6 +149,15 @@ A modern, AI-powered contact management application built with Firebase, React, 
 3. **View emulator UI:**
    Visit `http://localhost:4000` to inspect data and debug
 
+### Production
+
+**🌐 Live Application:** [https://contact-hub.net](https://contact-hub.net)
+
+The application is deployed on Firebase Hosting with custom domain configuration. The production build serves the same features as development but with optimized performance and security.
+
+**Firebase Project:** `contacthub-29950`
+**Custom Domain:** `contact-hub.net`
+
 ### Available Scripts
 
 ```bash
@@ -205,7 +214,15 @@ npm run type-check       # TypeScript type checking
 
 ### Firebase Setup
 
-The project is configured for Firebase project `contacthub-29950`. To use your own project:
+The project is configured for Firebase project `contacthub-29950` with custom domain `contact-hub.net`.
+
+**Current Configuration:**
+- **Firebase Project ID:** `contacthub-29950`
+- **Primary Domain:** `https://contact-hub.net`
+- **Firebase Hosting Site:** `contact-hub-net`
+- **Functions Region:** `us-central1`
+
+To use your own project:
 
 1. Create a new Firebase project at https://console.firebase.google.com/
 2. Enable Authentication, Firestore, Functions, and Hosting
