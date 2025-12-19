@@ -151,7 +151,9 @@ A modern, AI-powered contact management application built with Firebase, React, 
 
 ### Production
 
-**🌐 Live Application:** [https://contact-hub.net](https://contact-hub.net)
+**🌐 Live Application:**
+- **Primary**: [https://contact-hub.net](https://contact-hub.net) (custom domain - may take 24-48 hours)
+- **Immediate Access**: [https://contacthub-net.web.app](https://contacthub-net.web.app) (available now)
 
 The application is deployed on Firebase Hosting with custom domain configuration. The production build serves the same features as development but with optimized performance and security.
 

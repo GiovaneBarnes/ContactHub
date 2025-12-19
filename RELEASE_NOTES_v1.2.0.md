@@ -45,7 +45,8 @@
 - Stable CI/CD pipeline with comprehensive testing
 
 ## 🌐 Production Deployment
-- **Live Application**: https://contact-hub.net
+- **Primary Domain**: https://contact-hub.net (custom domain - may take 24-48 hours to activate)
+- **Backup Access**: https://contacthub-net.web.app (Firebase default - available immediately)
 - **Firebase Hosting**: Custom domain with SSL certificate
 - **Global CDN**: Fast, secure content delivery worldwide
 - **Production Ready**: Enterprise-grade security and performance
@@ -63,7 +64,14 @@
 
 ## 📋 Installation & Access
 
-**Web Application**: Visit https://contact-hub.net to start using ContactHub
+**🌐 Access Your ContactHub:**
+
+**Primary Domain (Recommended):**
+- https://contact-hub.net *(Custom domain - may take 24-48 hours to activate)*
+
+**Immediate Access:**
+- https://contacthub-net.web.app *(Firebase hosting - available now)*
+
 **Documentation**: Complete guides available in repository
 **Support**: Open issues on GitHub for bug reports and feature requests
 
