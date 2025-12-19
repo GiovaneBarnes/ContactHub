@@ -4,7 +4,7 @@ import path from 'path';
 
 /**
  * Vite plugin that updates og:image and twitter:image meta tags
- * to point to the app's opengraph image with the correct Replit domain.
+ * to point to the app's opengraph image with the correct deployment domain.
  */
 export function metaImagesPlugin(): Plugin {
   return {
@@ -73,6 +73,6 @@ function getDeploymentUrl(): string | null {
 
 function log(...args: any[]): void {
   if (process.env.NODE_ENV === 'production') {
-    console.log(...args);
+    // // console.log(...args);
   }
 }

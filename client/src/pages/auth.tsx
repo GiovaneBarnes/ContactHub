@@ -21,12 +21,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Users, MessageSquare, Clock } from "lucide-react";
+import { Loader2, Users, MessageSquare, Clock, ArrowLeft } from "lucide-react";
 import { validateEmail, sanitizeInput, rateLimiter, SECURITY_CONFIG } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Check, X } from "lucide-react";
+import { useEffect } from "react";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -65,6 +66,17 @@ export default function AuthPage() {
   // Get mode from query parameters
   const urlParams = new URLSearchParams(location.split('?')[1]);
   const defaultTab = urlParams.get('mode') === 'signup' ? 'signup' : 'login';
+
+  // Ensure back navigation goes to dashboard
+  useEffect(() => {
+    const handlePopState = () => {
+      // When user clicks back from auth page, redirect to dashboard
+      window.location.href = '/';
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -135,6 +147,16 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 dark:from-background dark:via-background dark:to-muted/10 flex items-center justify-center p-4 relative">
+      {/* Back button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => window.location.href = '/'}
+        className="absolute top-4 left-4 gap-2 z-10"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Dashboard
+      </Button>
 
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
@@ -385,6 +407,28 @@ export default function AuthPage() {
               </Form>
             </TabsContent>
           </Tabs>
+          
+          <div className="mt-6 space-y-3">
+            <div className="p-4 bg-muted/50 rounded-lg border border-border/50">
+              <p className="text-xs text-center text-muted-foreground">
+                🔒 Your data is encrypted and secure. We use AI to enhance your experience.{" "}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary font-medium">
+                  Learn more
+                </a>
+              </p>
+            </div>
+            
+            <p className="text-xs text-center text-muted-foreground">
+              By using ContactHub, you agree to our{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                Privacy Policy
+              </a>
+            </p>
+          </div>
         </CardContent>
       </Card>
       </div>

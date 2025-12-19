@@ -165,22 +165,22 @@ export function UpcomingSchedules() {
               return (
                 <div
                   key={`${occurrence.scheduleId}-${index}`}
-                  className={`flex items-center justify-between p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 interactive-card animate-fade-in ${occurrence.date > new Date() ? 'cursor-pointer hover:shadow-md' : 'cursor-not-allowed opacity-60'}`}
+                  className={`flex items-start justify-between gap-3 p-4 rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 interactive-card animate-fade-in ${occurrence.date > new Date() ? 'cursor-pointer hover:shadow-md' : 'cursor-not-allowed opacity-60'}`}
                   style={{ animationDelay: `${500 + index * 100}ms` }}
                   onClick={() => schedule && handleCardClick(occurrence, schedule, groupName)}
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline" className="text-xs border-primary/30 text-primary hover:bg-primary/10 transition-colors">
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="flex items-center gap-1.5 mb-2 overflow-hidden">
+                      <Badge variant="outline" className="text-xs border-primary/30 text-primary hover:bg-primary/10 transition-colors max-w-[120px] truncate">
                         {groupName}
                       </Badge>
                       {occurrence.scheduleName && (
-                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors">
+                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors max-w-[140px] truncate">
                           {occurrence.scheduleName}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm font-semibold text-foreground hover:text-primary transition-colors">
+                    <p className="text-sm font-semibold text-foreground hover:text-primary transition-colors truncate">
                       {occurrence.date.toLocaleDateString('en-US', {
                         weekday: 'short',
                         month: 'short',
@@ -194,12 +194,12 @@ export function UpcomingSchedules() {
                       })}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full border border-primary/20 hover:bg-primary/20 transition-colors">
+                  <div className="text-right flex-shrink-0 min-w-[80px]">
+                    <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full border border-primary/20 hover:bg-primary/20 transition-colors whitespace-nowrap">
                       {getDaysUntil(occurrence.date)}
                     </div>
                     {occurrence.date > new Date() && (
-                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1 justify-end whitespace-nowrap">
                         <Edit className="h-3 w-3" />
                         Click to edit
                       </div>

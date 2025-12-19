@@ -82,6 +82,30 @@ vi.mock('../firebase', () => ({
 // Mock fetch for SMS sending
 global.fetch = vi.fn()
 
+// Mock ContactHubAI
+vi.mock('../contact-hub-ai', () => ({
+  default: {
+    categorizeContact: vi.fn(() => Promise.resolve({
+      categories: ['Business'],
+      tags: ['client'],
+      reasoning: 'AI categorization'
+    })),
+    generatePersonalizedMessage: vi.fn((groupName) => Promise.resolve(`AI generated message for ${groupName}`)),
+    analyzeCommunicationPatterns: vi.fn(() => Promise.resolve({
+      frequency: 'Regular',
+      preferredMethod: 'Email',
+      nextContactSuggestion: 'Within 2 weeks',
+      insights: ['AI analysis']
+    })),
+    suggestContactTime: vi.fn(() => Promise.resolve({
+      recommendedTime: 'Next business day, 9 AM',
+      reasoning: 'AI scheduling',
+      alternatives: ['Tomorrow 2 PM', 'Friday 10 AM']
+    })),
+    generateContactSummary: vi.fn(() => Promise.resolve('AI generated summary'))
+  }
+}))
+
 // Mock data
 const mockContact = {
   id: 'doc-1',
@@ -430,7 +454,20 @@ describe('Firebase API', () => {
 
       vi.mocked(getDocs).mockResolvedValue(mockSnapshot as any)
 
-      const result = await firebaseApi.ai.categorizeContact('contact-1')
+      // Mock fetch for categorizeContact
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        text: vi.fn(() => Promise.resolve(JSON.stringify({
+          categories: ['Business'],
+          tags: ['client'],
+          reasoning: 'AI categorization'
+        }))),
+        headers: new Map()
+      }
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as any)
+
+      const result = await firebaseApi.contacts.categorizeContact('contact-1')
 
       expect(result).toHaveProperty('categories')
       expect(result).toHaveProperty('tags')

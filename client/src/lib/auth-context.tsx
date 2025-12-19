@@ -44,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, pass: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, pass);
+      // Wait a moment for auth state to propagate before redirecting
+      await new Promise(resolve => setTimeout(resolve, 100));
       setLocation('/');
       toast({ title: "Welcome back!", description: `Logged in as ${email}` });
       await metricsService.trackUserEngagement('login', { method: 'email' });
@@ -61,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await updateProfile(userCredential.user, {
         displayName: name
       });
+      // Wait a moment for auth state to propagate before redirecting
+      await new Promise(resolve => setTimeout(resolve, 100));
       setLocation('/');
       toast({ title: "Account created", description: "Welcome to Contact App!" });
       await metricsService.trackUserEngagement('signup', { method: 'email' });
@@ -74,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
-      setLocation('/auth');
+      setLocation('/');
       toast({ title: "Logged out", description: "See you next time!" });
       await metricsService.trackUserEngagement('logout');
       metricsService.endSession();
@@ -93,7 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    console.error('useAuth must be used within AuthProvider - context is undefined');
     // Return a default context to prevent crashes
     return {
       user: null,

@@ -27,32 +27,9 @@ let analyticsInstance: any = null;
 if (typeof window !== 'undefined' && firebaseConfig.measurementId && (!import.meta.env.DEV || import.meta.env.VITEST)) {
   try {
     analyticsInstance = getAnalytics(app);
-    console.log('📊 Firebase Analytics initialized successfully with measurementId:', firebaseConfig.measurementId);
-
-    // Test if analytics is working
-    if (analyticsInstance) {
-      console.log('📊 Analytics instance created, testing connection...');
-    }
   } catch (error) {
-    console.error('❌ Firebase Analytics initialization failed:', error);
-    const errorDetails = error instanceof Error ? {
-      message: error.message,
-      code: (error as any).code,
-      measurementId: firebaseConfig.measurementId
-    } : {
-      message: 'Unknown error',
-      code: 'UNKNOWN',
-      measurementId: firebaseConfig.measurementId
-    };
-    console.error('Error details:', errorDetails);
+    // Analytics initialization failed - continue without it
   }
-} else {
-  console.log('📊 Analytics not initialized:', {
-    hasWindow: typeof window !== 'undefined',
-    hasMeasurementId: !!firebaseConfig.measurementId,
-    isDev: import.meta.env.DEV,
-    isTest: import.meta.env.VITEST
-  });
 }
 
 export const analytics = analyticsInstance;
@@ -63,9 +40,8 @@ if (import.meta.env.DEV) {
     connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
     connectFirestoreEmulator(db, 'localhost', 8080);
     connectFunctionsEmulator(functions, "localhost", 5001);
-    console.log('🔥 Connected to Firebase emulators');
   } catch (error) {
-    console.warn('Failed to connect to emulators:', error);
+    // Emulator connection failed - continue without it
   }
 }
 

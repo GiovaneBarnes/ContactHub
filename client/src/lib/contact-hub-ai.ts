@@ -1,14 +1,16 @@
 import { httpsCallable } from 'firebase/functions';
 import { getFunctions } from 'firebase/functions';
+import { getAuth } from 'firebase/auth';
 import firebaseApp from './firebase';
 import { metricsService } from './metrics';
 
 // Fallback implementations for when Firebase Functions are not available
 const fallbackMessageGeneration = (groupName: string, backgroundInfo: string): string => {
   const templates = [
-    `Hello ${groupName} team! ${backgroundInfo} Let's connect soon.`,
-    `Greetings to the ${groupName} group. ${backgroundInfo} Looking forward to our next interaction.`,
-    `Hi everyone in ${groupName}! ${backgroundInfo} Please let me know if you need anything.`,
+    `Hey there! It's been a while since we last caught up with ${groupName}. ${backgroundInfo} How have you been?`,
+    `Hi! I've been thinking about our long conversations with ${groupName} and wanted to check in. ${backgroundInfo} What's new with you?`,
+    `Hello! Remembering our shared experiences with ${groupName} and thought it was time for a proper catch-up. ${backgroundInfo} How's everything going?`,
+    `Hey! It's been too long since our last chat with ${groupName}. ${backgroundInfo} I'd love to hear what you've been up to lately.`,
   ];
   return templates[Math.floor(Math.random() * templates.length)];
 };
@@ -39,7 +41,7 @@ const getFunctionsInstance = () => {
     try {
       functionsInstance = getFunctions(firebaseApp);
     } catch (error) {
-      console.warn('Firebase Functions not available:', error);
+      // Firebase Functions not available
       return null;
     }
   }
@@ -52,7 +54,8 @@ export class ContactHubAI {
     groupName: string,
     backgroundInfo: string,
     contactCount: number,
-    lastContactDate?: string
+    lastContactDate?: string,
+    groupId?: string
   ): Promise<string> {
     const startTime = Date.now();
     try {
@@ -60,13 +63,13 @@ export class ContactHubAI {
       let usedAI = false;
       let message: string;
 
-      if (functions) {
+      if (functions && groupId) {
         const generateGroupMessageFn = httpsCallable<{ groupId: string }, { message: string; generatedAt: any }>(functions, 'generateGroupMessage');
-        const result = await generateGroupMessageFn({ groupId: 'temp-group-id' });
+        const result = await generateGroupMessageFn({ groupId });
         message = result.data.message;
         usedAI = true;
       } else {
-        // Fallback when Firebase Functions not available
+        // Fallback when Firebase Functions not available or no groupId
         message = fallbackMessageGeneration(groupName, backgroundInfo);
       }
 
@@ -82,7 +85,6 @@ export class ContactHubAI {
 
       return message;
     } catch (error) {
-      console.error('AI Message Generation Error:', error);
       // Fallback to template-based generation
       const message = fallbackMessageGeneration(groupName, backgroundInfo);
       const duration = Date.now() - startTime;
@@ -106,7 +108,8 @@ export class ContactHubAI {
     email?: string,
     phone?: string,
     notes?: string,
-    existingTags?: string[]
+    existingTags?: string[],
+    contactId?: string
   ): Promise<{
     categories: string[];
     tags: string[];
@@ -117,10 +120,45 @@ export class ContactHubAI {
       const functions = getFunctionsInstance();
       let result: { categories: string[]; tags: string[]; reasoning: string; };
 
-      if (functions) {
-        const categorizeContactFn = httpsCallable<{ contactId: string }, { categories: string[]; tags: string[]; reasoning: string; generatedAt: any }>(functions, 'categorizeContact');
-        const response = await categorizeContactFn({ contactId: 'temp-contact-id' });
-        result = response.data;
+      if (functions && contactId) {
+        // Get the current user's ID token
+        const auth = getAuth(firebaseApp);
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+        
+        const idToken = await user.getIdToken();
+        
+        // Make direct HTTP request to the function
+        const functionUrl = `https://us-central1-contacthub-29950.cloudfunctions.net/categorizeContactV2`;
+        
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ contactId }),
+        });
+        
+        
+        const responseText = await response.text();
+        
+        if (!response.ok) {
+          throw new Error(`Function call failed: ${response.status} ${responseText}`);
+        }
+        
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError) {
+          throw new Error('Invalid JSON response from function');
+        }
+        
+        // Check if the result has the expected structure
+        if (!result || typeof result !== 'object' || !result.categories) {
+          throw new Error('Invalid response from categorization function');
+        }
       } else {
         result = fallbackCategorization(name);
       }
@@ -140,7 +178,6 @@ export class ContactHubAI {
 
       return result;
     } catch (error) {
-      console.error('AI Contact Categorization Error:', error);
       const result = fallbackCategorization(name);
       const duration = Date.now() - startTime;
 
@@ -157,6 +194,7 @@ export class ContactHubAI {
 
   // Analyze communication patterns
   static async analyzeCommunicationPatterns(
+    contactId: string,
     name: string,
     messageLogs: any[],
     lastContact: string,
@@ -168,16 +206,22 @@ export class ContactHubAI {
     insights: string[];
   }> {
     try {
-      // TODO: Implement Firebase Function call
-      return fallbackCommunicationAnalysis(name);
+      const callable = httpsCallable(getFunctions(), 'analyzeCommunicationPatterns');
+      const result = await callable({
+        contactId,
+        messageLogs,
+        lastContact,
+        relationship
+      });
+      return result.data as any;
     } catch (error) {
-      console.error('AI Communication Analysis Error:', error);
       return fallbackCommunicationAnalysis(name);
     }
   }
 
   // Smart scheduling recommendations
   static async suggestContactTime(
+    contactId: string,
     name: string,
     timezone: string = 'UTC',
     preferredTimes?: string[],
@@ -190,10 +234,17 @@ export class ContactHubAI {
     alternatives: string[];
   }> {
     try {
-      // TODO: Implement Firebase Function call
-      return fallbackSchedulingSuggestion(name);
+      const callable = httpsCallable(getFunctions(), 'suggestContactTime');
+      const result = await callable({
+        contactId,
+        timezone,
+        preferredTimes,
+        communicationStyle,
+        lastContact,
+        responsePatterns
+      });
+      return result.data as any;
     } catch (error) {
-      console.error('AI Scheduling Error:', error);
       return fallbackSchedulingSuggestion(name);
     }
   }
@@ -201,10 +252,13 @@ export class ContactHubAI {
   // Generate contact summaries and insights
   static async generateContactSummary(contact: any, interactions: any[]): Promise<string> {
     try {
-      // TODO: Implement Firebase Function call for summary generation
-      return `${contact.name} - Contact details available.`;
+      const callable = httpsCallable(getFunctions(), 'generateContactSummary');
+      const result = await callable({
+        contactId: contact.id,
+        interactions
+      });
+      return (result.data as any).summary;
     } catch (error) {
-      console.error('AI Summary Generation Error:', error);
       return `${contact.name} - Contact details available.`;
     }
   }

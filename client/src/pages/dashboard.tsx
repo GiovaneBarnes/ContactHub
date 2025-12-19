@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { firebaseApi } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Layers, MessageSquare, History, Plus, Send, Clock, LogIn, UserPlus } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Users, Layers, MessageSquare, History, Plus, Send, Clock, LogIn, UserPlus, Sparkles, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { UpcomingSchedules } from "@/components/upcoming-schedules";
@@ -22,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { metricsService } from "@/lib/metrics";
-import { useEffect } from "react";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
 
 export default function Dashboard() {
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
@@ -31,6 +32,7 @@ export default function Dashboard() {
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [sendImmediately, setSendImmediately] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading } = useAuth();
@@ -40,21 +42,77 @@ export default function Dashboard() {
     metricsService.trackPageView('dashboard');
   }, []);
 
-  const { data: contacts } = useQuery({ 
+  // Check if user should see onboarding
+  useEffect(() => {
+    if (user && !authLoading) {
+      const hasCompletedOnboarding = localStorage.getItem(
+        `onboarding_completed_${user.id}`
+      );
+      
+      // Show onboarding if not completed and user has no contacts
+      if (!hasCompletedOnboarding) {
+        // Small delay to let the dashboard render first
+        const timer = setTimeout(() => {
+          setShowOnboarding(true);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+
+  }, [user, authLoading]);
+
+  const handleOnboardingComplete = () => {
+    if (user) {
+      localStorage.setItem(`onboarding_completed_${user.id}`, "true");
+      setShowOnboarding(false);
+      // Refresh queries to show new data
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+      toast({
+        title: "Welcome to ContactHub! 🎉",
+        description: "You're all set up and ready to go.",
+      });
+    }
+  };
+
+  const { data: contacts, isLoading: contactsLoading, error: contactsError } = useQuery({ 
     queryKey: ['contacts'], 
-    queryFn: firebaseApi.contacts.list,
-    enabled: !!user // Only fetch if user is authenticated
+    queryFn: async () => {
+      const result = await firebaseApi.contacts.list();
+      return result;
+    },
+    enabled: !!user, // Only fetch if user is authenticated
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 30000
   });
-  const { data: groups } = useQuery({ 
+  const { data: groups, isLoading: groupsLoading, error: groupsError } = useQuery({ 
     queryKey: ['groups'], 
-    queryFn: firebaseApi.groups.list,
-    enabled: !!user // Only fetch if user is authenticated
+    queryFn: async () => {
+      const result = await firebaseApi.groups.list();
+      return result;
+    },
+    enabled: !!user, // Only fetch if user is authenticated
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 30000
   });
-  const { data: logs } = useQuery({ 
+  const { data: logs, isLoading: logsLoading, error: logsError } = useQuery({ 
     queryKey: ['logs'], 
-    queryFn: firebaseApi.logs.list,
-    enabled: !!user // Only fetch if user is authenticated
+    queryFn: async () => {
+      const result = await firebaseApi.logs.list();
+      return result;
+    },
+    enabled: !!user, // Only fetch if user is authenticated
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 30000
   });
+
+  const safeContacts = contacts || [];
+  const safeGroups = groups || [];
+  const safeLogs = logs || [];
 
   const sendMessageMutation = useMutation({
     mutationFn: ({ groupId, content }: { groupId: string; content: string }) => {
@@ -161,7 +219,7 @@ export default function Dashboard() {
   const stats = user ? [
     {
       label: "Total Contacts",
-      value: contacts?.length || 0,
+      value: safeContacts.length,
       icon: Users,
       color: "text-blue-400",
       bg: "bg-gradient-to-br from-blue-500/20 to-blue-600/20",
@@ -169,7 +227,7 @@ export default function Dashboard() {
     },
     {
       label: "Enabled Groups",
-      value: groups?.filter(group => group.enabled).length || 0,
+      value: safeGroups.filter(group => group.enabled).length,
       icon: Layers,
       color: "text-purple-400",
       bg: "bg-gradient-to-br from-purple-500/20 to-purple-600/20",
@@ -177,7 +235,7 @@ export default function Dashboard() {
     },
     {
       label: "Messages Sent",
-      value: logs?.length || 0,
+      value: safeLogs.length,
       icon: MessageSquare,
       color: "text-emerald-400",
       bg: "bg-gradient-to-br from-emerald-500/20 to-emerald-600/20",
@@ -210,8 +268,60 @@ export default function Dashboard() {
     },
   ];
 
+  // Show loading state while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if we have partial data even with errors - don't block the whole page
+  const hasAnyError = contactsError || groupsError || logsError;
+  const hasPartialData = contacts || groups || logs;
+
+  // Simple loading check - only show loading on truly first load
+  const hasAnyData = contacts || groups || logs;
+  const isStillLoading = (contactsLoading || groupsLoading || logsLoading);
+  
+  if (user && !hasAnyData && isStillLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading your data...</p>
+          <p className="text-xs text-muted-foreground">First load may take a moment...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Inline error banner - doesn't block the page */}
+      {user && hasAnyError && (
+        <Alert variant="default" className="border-amber-200 bg-amber-50/50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            Some data couldn't load. {hasPartialData ? 'Showing available data.' : 'Try refreshing the page.'}
+            {!hasPartialData && (
+              <Button 
+                variant="link" 
+                size="sm" 
+                onClick={() => window.location.reload()}
+                className="ml-2 h-auto p-0 text-amber-800 underline"
+              >
+                Refresh now
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Demo Banner */}
       {!user && !authLoading && (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 border border-blue-200/50 backdrop-blur-sm">
@@ -249,7 +359,7 @@ export default function Dashboard() {
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-chart-2/10 rounded-2xl blur-3xl -z-10" />
         <div className="relative">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h2 className="text-4xl font-display font-bold tracking-tight text-gradient mb-2">
                 {user ? 'Dashboard' : 'ContactHub Preview'}
@@ -259,9 +369,24 @@ export default function Dashboard() {
               </p>
             </div>
             {user && (
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground">Welcome back!</div>
-                <div className="font-medium text-foreground">{user.name}</div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    localStorage.removeItem(`onboarding_completed_${user.id}`);
+                    setShowOnboarding(true);
+                    metricsService.trackFeatureUsage('onboarding_restarted');
+                  }}
+                  className="w-full sm:w-auto gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Quick Start Guide
+                </Button>
+                <div className="text-center sm:text-right">
+                  <div className="text-sm text-muted-foreground">Welcome back!</div>
+                  <div className="font-medium text-foreground">{user.name}</div>
+                </div>
               </div>
             )}
           </div>
@@ -631,6 +756,12 @@ export default function Dashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Onboarding Wizard */}
+      <OnboardingWizard
+        open={showOnboarding}
+        onComplete={handleOnboardingComplete}
+      />
     </div>
   );
 }

@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import ContactHubAI from '../contact-hub-ai'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 
+// Mock fetch
+global.fetch = vi.fn()
+
 // Mock Firebase modules
 vi.mock('../firebase', () => ({
   default: { type: 'firebase-app-mock' }
@@ -10,6 +13,14 @@ vi.mock('../firebase', () => ({
 vi.mock('firebase/functions', () => ({
   getFunctions: vi.fn(),
   httpsCallable: vi.fn()
+}))
+
+vi.mock('firebase/auth', () => ({
+  getAuth: vi.fn(() => ({
+    currentUser: {
+      getIdToken: vi.fn(() => Promise.resolve('mock-token'))
+    }
+  }))
 }))
 
 vi.mock('../metrics', () => ({
@@ -40,12 +51,14 @@ describe('ContactHubAI', () => {
       const result = await ContactHubAI.generatePersonalizedMessage(
         'Test Group',
         'Background info',
-        5
+        5,
+        undefined,
+        'test-group-id'
       )
 
       expect(result).toBe('AI generated message')
       expect(httpsCallable).toHaveBeenCalledWith('mock-functions', 'generateGroupMessage')
-      expect(mockCallable).toHaveBeenCalledWith({ groupId: 'temp-group-id' })
+      expect(mockCallable).toHaveBeenCalledWith({ groupId: 'test-group-id' })
     })
 
     it('should fallback to template when Firebase Functions not available', async () => {
@@ -110,28 +123,43 @@ describe('ContactHubAI', () => {
   describe('categorizeContact', () => {
     it('should categorize contact using Firebase Functions when available', async () => {
       vi.mocked(getFunctions).mockReturnValue('mock-functions')
-      const mockCallable = vi.fn(() => Promise.resolve({
-        data: {
+
+      // Mock fetch for the categorizeContactV2 call
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        text: vi.fn(() => Promise.resolve(JSON.stringify({
           categories: ['Business', 'VIP'],
           tags: ['client', 'important'],
-          reasoning: 'AI categorization',
-          generatedAt: new Date()
-        }
-      }))
-      vi.mocked(httpsCallable).mockReturnValue(mockCallable)
+          reasoning: 'AI categorization'
+        }))),
+        headers: new Map()
+      }
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as any)
 
       const result = await ContactHubAI.categorizeContact(
         'John Doe',
         'john@example.com',
         '+1234567890',
-        'Important client'
+        'Important client',
+        undefined,
+        'test-contact-id'
       )
 
       expect(result.categories).toEqual(['Business', 'VIP'])
       expect(result.tags).toEqual(['client', 'important'])
       expect(result.reasoning).toBe('AI categorization')
-      expect(httpsCallable).toHaveBeenCalledWith('mock-functions', 'categorizeContact')
-      expect(mockCallable).toHaveBeenCalledWith({ contactId: 'temp-contact-id' })
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://us-central1-contacthub-29950.cloudfunctions.net/categorizeContactV2',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer mock-token'
+          }),
+          body: JSON.stringify({ contactId: 'test-contact-id' })
+        })
+      )
     })
 
     it('should fallback to default categorization when Firebase Functions not available', async () => {
@@ -197,6 +225,7 @@ describe('ContactHubAI', () => {
   describe('analyzeCommunicationPatterns', () => {
     it('should return fallback analysis', async () => {
       const result = await ContactHubAI.analyzeCommunicationPatterns(
+        'test-contact-id',
         'John Doe',
         [],
         '2024-01-01',
@@ -213,6 +242,7 @@ describe('ContactHubAI', () => {
 
     it('should handle empty message logs', async () => {
       const result = await ContactHubAI.analyzeCommunicationPatterns(
+        'test-contact-id',
         'John Doe',
         [],
         '2024-01-01'
@@ -224,6 +254,7 @@ describe('ContactHubAI', () => {
 
     it('should handle different relationship types', async () => {
       const result = await ContactHubAI.analyzeCommunicationPatterns(
+        'test-contact-id',
         'John Doe',
         [],
         '2024-01-01',
@@ -237,6 +268,7 @@ describe('ContactHubAI', () => {
   describe('suggestContactTime', () => {
     it('should return fallback scheduling suggestion', async () => {
       const result = await ContactHubAI.suggestContactTime(
+        'test-contact-id',
         'John Doe',
         'UTC',
         ['9:00 AM'],
@@ -251,7 +283,7 @@ describe('ContactHubAI', () => {
     })
 
     it('should handle minimal parameters', async () => {
-      const result = await ContactHubAI.suggestContactTime('John Doe')
+      const result = await ContactHubAI.suggestContactTime('test-contact-id', 'John Doe')
 
       expect(result.recommendedTime).toBe('Next business day, 9 AM')
       expect(result.alternatives).toHaveLength(2)
@@ -259,6 +291,7 @@ describe('ContactHubAI', () => {
 
     it('should handle different timezones', async () => {
       const result = await ContactHubAI.suggestContactTime(
+        'test-contact-id',
         'John Doe',
         'America/New_York'
       )

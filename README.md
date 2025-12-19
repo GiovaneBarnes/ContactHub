@@ -2,7 +2,7 @@
 
 A modern, AI-powered contact management application built with Firebase, React, and cutting-edge AI capabilities. Manage your contacts, organize them into groups, and communicate intelligently with AI-generated messages.
 
-![ContactHub](https://img.shields.io/badge/ContactHub-1.1.0-blue?style=for-the-badge)
+![ContactHub](https://img.shields.io/badge/ContactHub-1.2.0-blue?style=for-the-badge)
 ![Firebase](https://img.shields.io/badge/Firebase-Enabled-orange?style=flat-square)
 ![AI Powered](https://img.shields.io/badge/AI-Powered-purple?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?style=flat-square)
@@ -12,8 +12,9 @@ A modern, AI-powered contact management application built with Firebase, React, 
 ### 🤖 AI-Powered Features
 - **Smart Message Generation**: AI-crafted messages tailored to your groups and relationships
 - **Intelligent Contact Categorization**: Automatic tagging and categorization of new contacts
-- **Communication Insights**: AI-driven analysis of contact patterns and preferences
+- **Communication Insights**: AI-driven analysis of contact patterns and preferences with detailed insights drawer
 - **Personalized Scheduling**: Smart suggestions for optimal contact timing
+- **AI Feature Indicators**: Visual badges and guided tours for AI-powered functionality
 
 ### 📊 Advanced Analytics & Metrics
 - **Comprehensive User Tracking**: Detailed analytics on user behavior, feature usage, and engagement
@@ -27,6 +28,7 @@ A modern, AI-powered contact management application built with Firebase, React, 
 - **Advanced Group Management**: Organize contacts into groups with custom schedules
 - **Bulk Operations**: Import/export contacts, bulk delete, and batch operations
 - **Rich Contact Profiles**: Store emails, phone numbers, notes, and custom fields
+- **Contact Insights**: AI-powered analysis drawer showing communication patterns, optimal contact times, and relationship insights
 
 ### 📅 Scheduling System
 - **Flexible Scheduling**: One-time and recurring schedules with custom intervals
@@ -34,11 +36,18 @@ A modern, AI-powered contact management application built with Firebase, React, 
 - **Schedule Management**: View upcoming schedules and manage delivery times
 - **Calendar Integration**: Visual schedule overview with conflict detection
 
+### 🎯 User Onboarding & Experience
+- **Interactive Onboarding Wizard**: 3-step guided experience for new users covering contact creation, AI messaging, and scheduling
+- **Quick Start Guide**: Re-triggerable onboarding for existing users and feature refresher
+- **Progressive Disclosure**: Show features as users need them with contextual guidance
+- **Empty State Solutions**: Immediate value delivery to prevent user intimidation
+
 ### 🔐 Security & Privacy
 - **Firebase Authentication**: Secure user authentication with email/password
 - **Data Encryption**: All data encrypted in transit and at rest
 - **Access Control**: User-based data isolation and security rules
 - **CSP Protection**: Content Security Policy for enhanced security
+- **Logging Security**: All console logging disabled for production privacy
 
 ### 🎨 Modern UI/UX
 - **Responsive Design**: Works perfectly on desktop, tablet, and mobile
@@ -140,6 +149,15 @@ A modern, AI-powered contact management application built with Firebase, React, 
 3. **View emulator UI:**
    Visit `http://localhost:4000` to inspect data and debug
 
+### Production
+
+**🌐 Live Application:** [https://contact-hub.net](https://contact-hub.net)
+
+The application is deployed on Firebase Hosting with custom domain configuration. The production build serves the same features as development but with optimized performance and security.
+
+**Firebase Project:** `contacthub-29950`
+**Custom Domain:** `contact-hub.net`
+
 ### Available Scripts
 
 ```bash
@@ -196,7 +214,15 @@ npm run type-check       # TypeScript type checking
 
 ### Firebase Setup
 
-The project is configured for Firebase project `contacthub-29950`. To use your own project:
+The project is configured for Firebase project `contacthub-29950` with custom domain `contact-hub.net`.
+
+**Current Configuration:**
+- **Firebase Project ID:** `contacthub-29950`
+- **Primary Domain:** `https://contact-hub.net`
+- **Firebase Hosting Site:** `contact-hub-net`
+- **Functions Region:** `us-central1`
+
+To use your own project:
 
 1. Create a new Firebase project at https://console.firebase.google.com/
 2. Enable Authentication, Firestore, Functions, and Hosting
@@ -342,7 +368,14 @@ The analytics dashboard is designed for **administrators and developers** to:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **Apache License 2.0**, chosen for its patent protection provisions that help safeguard both contributors and users from patent litigation. The Apache License provides:
+
+- **Patent Protection**: Explicit patent grant and retaliation clauses protect against patent trolls
+- **Commercial Friendly**: Allows commercial use, modification, and distribution
+- **Copyleft Balance**: Modified versions can be proprietary, but modifications must be disclosed
+- **Compatibility**: Compatible with GPL v3 and many other open source licenses
+
+See the [LICENSE](LICENSE) file for the complete license text.
 
 ## 🙏 Acknowledgments
 
