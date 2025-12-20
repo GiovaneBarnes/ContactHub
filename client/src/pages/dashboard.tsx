@@ -4,7 +4,7 @@ import { firebaseApi } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, Layers, MessageSquare, History, Plus, Send, Clock, LogIn, UserPlus, Sparkles, AlertTriangle } from "lucide-react";
+import { Users, Layers, MessageSquare, History, Plus, Send, Clock, LogIn, UserPlus, Sparkles, AlertTriangle, Upload, Brain, Zap, Shield, TrendingUp, Target, BarChart3, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { UpcomingSchedules } from "@/components/upcoming-schedules";
@@ -322,38 +322,164 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      {/* Demo Banner */}
+      {/* Hero Section for non-authenticated users */}
       {!user && !authLoading && (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 border border-blue-200/50 backdrop-blur-sm">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 animate-pulse" />
-          <div className="relative p-6 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 text-blue-700 text-sm font-medium mb-3">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-              Live Preview
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Welcome to ContactHub
-            </h3>
-            <p className="text-gray-600 mb-4 max-w-md mx-auto">
-              Experience the power of automated contact management. This is a live preview of our platform - 
-              sign up to unlock the full potential and start managing your contacts today.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Link href="/auth?mode=signup">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Get Started Free
-                </Button>
-              </Link>
-              <Link href="/auth?mode=login">
-                <Button variant="outline" className="border-gray-300 hover:bg-gray-50">
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Sign In
-                </Button>
-              </Link>
+        <>
+          {/* Hero Banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-purple-600 to-emerald-600 p-12 text-white animate-slide-up">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6TTI0IDM0YzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6bTAtMTBjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00ek00OCAzNGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6bTAtMTBjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-20" />
+            <div className="relative z-10 max-w-4xl mx-auto text-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-sm font-medium mb-6 animate-fade-in">
+                <Sparkles className="h-4 w-4" />
+                AI-Powered Contact Management
+              </div>
+              <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight animate-slide-up" style={{ animationDelay: '100ms' }}>
+                Manage Contacts.<br />Build Relationships.
+              </h1>
+              <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-2xl mx-auto animate-slide-up" style={{ animationDelay: '200ms' }}>
+                Import from anywhere, automate everything, and let AI help you stay connected with the people that matter.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8 animate-slide-up" style={{ animationDelay: '300ms' }}>
+                <Link href="/auth?mode=signup">
+                  <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 shadow-2xl hover:shadow-3xl transition-all duration-300 px-8 py-6 text-lg font-semibold">
+                    <UserPlus className="h-5 w-5 mr-2" />
+                    Start Free Today
+                  </Button>
+                </Link>
+                <Link href="/auth?mode=login">
+                  <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/10 backdrop-blur-sm px-8 py-6 text-lg">
+                    <LogIn className="h-5 w-5 mr-2" />
+                    Sign In
+                  </Button>
+                </Link>
+              </div>
+              <div className="flex items-center justify-center gap-8 text-sm text-white/80 animate-fade-in" style={{ animationDelay: '400ms' }}>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 bg-emerald-400 rounded-full" />
+                  No credit card required
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 bg-emerald-400 rounded-full" />
+                  Free forever plan
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 bg-emerald-400 rounded-full" />
+                  Setup in 2 minutes
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Core Value Props - Only 3 Main Features */}
+          <div className="grid gap-8 md:grid-cols-3 animate-slide-up" style={{ animationDelay: '100ms' }}>
+            <Card className="group relative overflow-hidden glass hover-lift border-2 border-blue-200/50 hover:border-blue-400/50 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardContent className="relative p-8">
+                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 w-fit hover-scale">
+                  <Upload className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4 text-foreground group-hover:text-blue-600 transition-colors">
+                  Import Instantly
+                </h3>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
+                  One-click import from Google, Apple, or any vCard file. Your entire network, ready in seconds. Zero manual entry.
+                </p>
+                <div className="flex items-center text-blue-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                  Learn more →
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="group relative overflow-hidden glass hover-lift border-2 border-purple-200/50 hover:border-purple-400/50 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardContent className="relative p-8">
+                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 w-fit hover-scale">
+                  <Brain className="h-8 w-8 text-purple-600" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4 text-foreground group-hover:text-purple-600 transition-colors">
+                  AI That Gets You
+                </h3>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
+                  Smart message generation, automatic categorization, and insights that help you communicate better with everyone.
+                </p>
+                <div className="flex items-center text-purple-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                  Learn more →
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="group relative overflow-hidden glass hover-lift border-2 border-emerald-200/50 hover:border-emerald-400/50 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-emerald-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardContent className="relative p-8">
+                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/30 w-fit hover-scale">
+                  <Zap className="h-8 w-8 text-emerald-600" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4 text-foreground group-hover:text-emerald-600 transition-colors">
+                  Automate Everything
+                </h3>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
+                  Schedule messages, create smart groups, and never miss important connections. Set it once, stay connected forever.
+                </p>
+                <div className="flex items-center text-emerald-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                  Learn more →
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Secondary Features Grid - Compact */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-900 dark:to-blue-950/30 p-8 border border-slate-200 dark:border-slate-800 animate-slide-up" style={{ animationDelay: '200ms' }}>
+            <h3 className="text-2xl font-bold text-center mb-8 text-foreground">Everything you need to manage relationships</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="flex flex-col items-center text-center p-4 rounded-xl hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors group">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/30 mb-3 group-hover:scale-110 transition-transform">
+                  <TrendingUp className="h-6 w-6 text-cyan-600" />
+                </div>
+                <h4 className="font-semibold text-sm mb-1">Contact Insights</h4>
+                <p className="text-xs text-muted-foreground">AI-powered analytics</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-4 rounded-xl hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors group">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30 mb-3 group-hover:scale-110 transition-transform">
+                  <Target className="h-6 w-6 text-orange-600" />
+                </div>
+                <h4 className="font-semibold text-sm mb-1">Smart Reminders</h4>
+                <p className="text-xs text-muted-foreground">Never forget to follow up</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-4 rounded-xl hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors group">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-600/20 border border-pink-500/30 mb-3 group-hover:scale-110 transition-transform">
+                  <BarChart3 className="h-6 w-6 text-pink-600" />
+                </div>
+                <h4 className="font-semibold text-sm mb-1">Advanced Analytics</h4>
+                <p className="text-xs text-muted-foreground">Track engagement metrics</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-4 rounded-xl hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors group">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-500/20 to-slate-600/20 border border-slate-500/30 mb-3 group-hover:scale-110 transition-transform">
+                  <Shield className="h-6 w-6 text-slate-600" />
+                </div>
+                <h4 className="font-semibold text-sm mb-1">Private & Secure</h4>
+                <p className="text-xs text-muted-foreground">Encrypted by default</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Final CTA */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 p-10 text-white text-center animate-slide-up" style={{ animationDelay: '300ms' }}>
+            <div className="absolute inset-0 bg-black/10" />
+            <div className="relative z-10">
+              <h3 className="text-3xl font-bold mb-4">Ready to transform your contact management?</h3>
+              <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
+                Join professionals who've automated their networking and never miss a connection.
+              </p>
+              <Link href="/auth?mode=signup">
+                <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 shadow-2xl hover:shadow-3xl transition-all duration-300 px-10 py-6 text-lg font-semibold">
+                  <UserPlus className="h-5 w-5 mr-2" />
+                  Get Started Free - No Credit Card
+                </Button>
+              </Link>
+              <p className="text-sm text-white/70 mt-4">Already have an account? <Link href="/auth?mode=login"><span className="underline font-medium hover:text-white cursor-pointer">Sign in here</span></Link></p>
+            </div>
+          </div>
+        </>
       )}
 
       <div className="relative">

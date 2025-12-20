@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence, enableMultiTabIndexedDbPersistence, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
+import { getAuth, connectAuthEmulator, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getAnalytics } from "firebase/analytics";
 
@@ -21,6 +21,26 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const functions = getFunctions(app, "us-central1"); // Specify region to match function deployment
+
+// Enable Firebase offline persistence for blazing fast loads
+if (typeof window !== 'undefined') {
+  // Enable Firestore persistence (offline support + caching)
+  enableMultiTabIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      // Multiple tabs open, persistence only enabled in one tab
+      enableIndexedDbPersistence(db, { forceOwnership: false }).catch(() => {
+        // Persistence failed, continue without it
+      });
+    } else if (err.code === 'unimplemented') {
+      // Browser doesn't support persistence
+    }
+  });
+  
+  // Enable auth persistence
+  setPersistence(auth, browserLocalPersistence).catch(() => {
+    // Auth persistence failed, continue
+  });
+}
 
 // Initialize Analytics only if measurementId is available and we're in production or test environment
 let analyticsInstance: any = null;

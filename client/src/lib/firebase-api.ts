@@ -5,11 +5,15 @@ import {
   deleteDoc, 
   doc, 
   getDocs,
+  getDoc,
   query,
   where,
   orderBy,
+  limit,
+  startAfter,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  writeBatch
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
@@ -22,6 +26,10 @@ import { metricsService } from './metrics';
 const CONTACTS_COLLECTION = "contacts";
 const GROUPS_COLLECTION = "groups";
 const LOGS_COLLECTION = "messageLogs";
+
+// Performance: Query limits to prevent massive data fetches
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_BATCH_SIZE = 500;
 
 // Helper to get current user ID
 const getCurrentUserId = (): string => {
@@ -119,30 +127,53 @@ export const firebaseApi = {
       if (!userId) return []; // Return empty array if not authenticated
       
       const contactsRef = collection(db, CONTACTS_COLLECTION);
-      const q = query(contactsRef, where("userId", "==", userId), orderBy("name"));
+      // Load all contacts - Firebase persistence caches locally after first load
+      // No artificial limit - let users see all their contacts
+      const q = query(
+        contactsRef, 
+        where("userId", "==", userId), 
+        orderBy("name")
+      );
       const snapshot = await getDocs(q);
       return snapshot.docs.map(docToContact);
     },
 
     create: async (data: Omit<Contact, 'id'>): Promise<Contact> => {
       const userId = getCurrentUserId();
+      console.log(`[FirebaseAPI] Creating contact: ${data.name} (user: ${userId})`);
+      
       const contactsRef = collection(db, CONTACTS_COLLECTION);
       const cleanedData = cleanFirestoreData(data);
-      const docRef = await addDoc(contactsRef, {
-        ...cleanedData,
-        userId,
-        createdAt: serverTimestamp()
-      });
-      const contact = {
-        id: docRef.id,
-        ...data
-      };
-      await metricsService.trackContactAction('create', {
-        contactId: contact.id,
-        hasEmail: !!data.email,
-        hasPhone: !!data.phone
-      });
-      return contact;
+      
+      console.log(`[FirebaseAPI] Cleaned data:`, cleanedData);
+      
+      try {
+        const docRef = await addDoc(contactsRef, {
+          ...cleanedData,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        console.log(`[FirebaseAPI] Contact created with ID: ${docRef.id}`);
+        
+        const contact = {
+          id: docRef.id,
+          ...data
+        };
+        
+        await metricsService.trackContactAction('create', {
+          contactId: contact.id,
+          hasEmail: !!data.email,
+          hasPhone: !!data.phone
+        });
+        
+        return contact;
+      } catch (error: any) {
+        console.error(`[FirebaseAPI] Error creating contact:`, error);
+        console.error(`[FirebaseAPI] Error code:`, error.code);
+        console.error(`[FirebaseAPI] Error message:`, error.message);
+        throw error;
+      }
     },
 
     update: async (id: string, data: Partial<Contact>): Promise<Contact> => {

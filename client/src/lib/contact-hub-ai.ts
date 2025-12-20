@@ -4,35 +4,152 @@ import { getAuth } from 'firebase/auth';
 import firebaseApp from './firebase';
 import { metricsService } from './metrics';
 
-// Fallback implementations for when Firebase Functions are not available
+// Professional fallback implementations for when Firebase Functions are not available
 const fallbackMessageGeneration = (groupName: string, backgroundInfo: string): string => {
-  const templates = [
-    `Hey there! It's been a while since we last caught up with ${groupName}. ${backgroundInfo} How have you been?`,
-    `Hi! I've been thinking about our long conversations with ${groupName} and wanted to check in. ${backgroundInfo} What's new with you?`,
-    `Hello! Remembering our shared experiences with ${groupName} and thought it was time for a proper catch-up. ${backgroundInfo} How's everything going?`,
-    `Hey! It's been too long since our last chat with ${groupName}. ${backgroundInfo} I'd love to hear what you've been up to lately.`,
+  // Generate contextual, complete messages based on background info
+  const hasSpecificContext = backgroundInfo && backgroundInfo.length > 20 && 
+                             !backgroundInfo.toLowerCase().includes('long-time') &&
+                             !backgroundInfo.toLowerCase().includes('staying connected');
+  
+  const templates = hasSpecificContext ? [
+    // Context-aware templates when we have specific background info
+    `Hey! Hope you've been doing well. I've been reflecting on ${backgroundInfo.toLowerCase()} and wanted to reach out. It's been too long since we properly caught up. What have you been working on lately? Would love to hear what's new with you. Let me know if you're free for a call or coffee in the next couple weeks!`,
+    `Hi! It's been a while and I wanted to check in. ${backgroundInfo} has been on my mind recently, and I'd value hearing your perspective. How have things been going for you? Are you available for a quick catch-up sometime soon?`,
+    `Hello! Hope this finds you well. I was thinking about ${backgroundInfo.toLowerCase()} and realized we haven't connected in too long. I'd love to hear what you've been up to and share some updates on my end as well. Free for a call or coffee in the next week or two?`
+  ] : [
+    // General templates when context is minimal
+    `Hey! How have you been? I realized it's been way too long since we properly caught up. What have you been working on lately? I'd love to hear what's new in your world. Let me know if you're free for coffee or a quick call in the next couple weeks!`,
+    `Hi! Hope you've been doing well. It feels like forever since we last talked, and I wanted to reach out to see how things are going. Would you be open to catching up over coffee or a call sometime soon? I'd really love to reconnect.`,
+    `Hello! It's been too long since our last conversation. I've been meaning to reach out and see how you're doing. Life has been busy but I'd really like to catch up properly. Are you available for a coffee or quick call in the next week or two?`,
+    `Hey! Hope everything is going great with you. I was just thinking it's been a while since we connected, and I wanted to check in. What's new in your world? Let me know if you have time for a catch-up session soon!`
   ];
+  
   return templates[Math.floor(Math.random() * templates.length)];
 };
 
-const fallbackCategorization = (name: string) => ({
-  categories: ['General'],
-  tags: ['contact'],
-  reasoning: 'AI service temporarily unavailable - using fallback categorization'
-});
+const fallbackCategorization = (name: string, email?: string, phone?: string, notes?: string) => {
+  const categories: string[] = [];
+  const tags: string[] = [];
+  const signals: string[] = [];
+  
+  // Intelligent categorization based on available data
+  const notesLower = (notes || '').toLowerCase();
+  const emailDomain = email?.split('@')[1]?.toLowerCase();
+  
+  // Email domain analysis
+  const personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'me.com'];
+  if (emailDomain) {
+    if (personalDomains.includes(emailDomain)) {
+      categories.push('Personal');
+      signals.push('personal email domain');
+    } else {
+      categories.push('Professional');
+      signals.push('business email domain');
+    }
+  }
+  
+  // Notes analysis
+  if (notesLower.includes('work') || notesLower.includes('colleague') || notesLower.includes('client')) {
+    if (!categories.includes('Professional')) categories.push('Professional');
+    signals.push('work-related notes');
+  }
+  if (notesLower.includes('friend') || notesLower.includes('buddy')) {
+    categories.push('Friend');
+    signals.push('friendship indicators');
+  }
+  if (notesLower.includes('family') || notesLower.includes('relative')) {
+    categories.push('Family');
+    signals.push('family relationship');
+  }
+  
+  // Default category if none detected
+  if (categories.length === 0) {
+    categories.push('General');
+    signals.push('no specific categorization signals');
+  }
+  
+  // Smart tagging
+  tags.push('contact');
+  if (email && !phone) tags.push('email-first');
+  if (phone && !email) tags.push('phone-first');
+  if (notesLower.includes('follow up') || notesLower.includes('follow-up')) tags.push('follow-up');
+  
+  return {
+    categories: categories.slice(0, 3),
+    tags: tags.slice(0, 5),
+    reasoning: `Heuristic categorization based on: ${signals.join(', ')}. AI service temporarily unavailable - using pattern matching.`
+  };
+};
 
-const fallbackCommunicationAnalysis = (name: string) => ({
-  frequency: 'Regular',
-  preferredMethod: 'Email',
-  nextContactSuggestion: 'Within 2 weeks',
-  insights: ['AI analysis temporarily unavailable']
-});
+const fallbackCommunicationAnalysis = (name: string, messageLogs?: any[], lastContact?: string) => {
+  // Analyze message logs if available
+  let frequency = 'Regular';
+  let preferredMethod = 'Email';
+  const insights: string[] = [];
+  
+  if (messageLogs && messageLogs.length > 0) {
+    // Analyze frequency
+    if (messageLogs.length >= 10) {
+      frequency = 'Frequent (10+ interactions)';
+      insights.push('Strong communication history indicates engaged relationship');
+    } else if (messageLogs.length >= 5) {
+      frequency = 'Moderate (5-10 interactions)';
+      insights.push('Growing relationship with consistent interaction pattern');
+    } else {
+      frequency = 'Occasional (1-5 interactions)';
+      insights.push('Early-stage relationship - consider more frequent check-ins');
+    }
+    
+    // Determine preferred method
+    const methods = messageLogs.map(log => log.method || log.type).filter(Boolean);
+    const methodCounts: Record<string, number> = {};
+    methods.forEach(m => methodCounts[m] = (methodCounts[m] || 0) + 1);
+    preferredMethod = Object.entries(methodCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Email';
+    insights.push(`Primary communication via ${preferredMethod} based on ${messageLogs.length} interaction${messageLogs.length === 1 ? '' : 's'}`);
+  } else {
+    insights.push('No communication history yet - establishing baseline recommended');
+    insights.push('Consider initial outreach to understand preferred communication style');
+  }
+  
+  // Last contact analysis
+  if (lastContact && lastContact !== 'Unknown') {
+    try {
+      const lastDate = new Date(lastContact);
+      const daysSince = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSince > 90) {
+        insights.push(`Over ${Math.floor(daysSince / 30)} months since last contact - overdue for check-in`);
+      }
+    } catch (e) {
+      // Invalid date, ignore
+    }
+  }
+  
+  return {
+    frequency,
+    preferredMethod,
+    nextContactSuggestion: messageLogs && messageLogs.length > 5 ? 'Within 2-3 weeks to maintain rhythm' : 'Within 1 week to establish connection',
+    insights: insights.slice(0, 3)
+  };
+};
 
-const fallbackSchedulingSuggestion = (name: string) => ({
-  recommendedTime: 'Next business day, 9 AM',
-  reasoning: 'AI scheduling temporarily unavailable',
-  alternatives: ['Tomorrow 2 PM', 'Friday 10 AM']
-});
+const fallbackSchedulingSuggestion = (name: string, timezone: string = 'UTC', communicationStyle: string = 'professional') => {
+  const now = new Date();
+  const isProfessional = communicationStyle.toLowerCase().includes('professional') || 
+                        communicationStyle.toLowerCase().includes('business');
+  
+  // Generate appropriate time based on style
+  const recommendedDay = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000)); // 2 days from now
+  const dayName = recommendedDay.toLocaleDateString('en-US', { weekday: 'long' });
+  const primaryTime = isProfessional ? '10:00 AM' : '7:00 PM';
+  
+  return {
+    recommendedTime: `${dayName}, ${primaryTime} ${timezone}`,
+    reasoning: `${isProfessional ? 'Mid-morning business hours' : 'Evening personal time'} in ${timezone} timezone. Selected to respect ${communicationStyle} communication style and typical availability patterns.`,
+    alternatives: isProfessional 
+      ? [`Tuesday, 2:00 PM ${timezone}`, `Wednesday, 9:30 AM ${timezone}`, `Thursday, 3:00 PM ${timezone}`]
+      : [`Saturday, 11:00 AM ${timezone}`, `Sunday, 2:00 PM ${timezone}`, `Friday, 6:30 PM ${timezone}`]
+  };
+};
 
 // Lazy initialization of Firebase Functions
 let functionsInstance: any = null;
@@ -160,7 +277,7 @@ export class ContactHubAI {
           throw new Error('Invalid response from categorization function');
         }
       } else {
-        result = fallbackCategorization(name);
+        result = fallbackCategorization(name, email, phone, notes);
       }
 
       const duration = Date.now() - startTime;
@@ -178,7 +295,7 @@ export class ContactHubAI {
 
       return result;
     } catch (error) {
-      const result = fallbackCategorization(name);
+      const result = fallbackCategorization(name, email, phone, notes);
       const duration = Date.now() - startTime;
 
       await metricsService.trackAIAction('categorize_contact', {
@@ -215,7 +332,7 @@ export class ContactHubAI {
       });
       return result.data as any;
     } catch (error) {
-      return fallbackCommunicationAnalysis(name);
+      return fallbackCommunicationAnalysis(name, messageLogs, lastContact);
     }
   }
 
@@ -245,7 +362,7 @@ export class ContactHubAI {
       });
       return result.data as any;
     } catch (error) {
-      return fallbackSchedulingSuggestion(name);
+      return fallbackSchedulingSuggestion(name, timezone, communicationStyle);
     }
   }
 

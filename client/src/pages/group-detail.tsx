@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useRoute } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { firebaseApi } from "@/lib/firebase-api";
@@ -44,12 +44,30 @@ export default function GroupDetailPage() {
     queryFn: firebaseApi.contacts.list
   });
 
-  const filteredContacts = (allContacts || [])?.filter(c => 
-    c.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
-    c.email.toLowerCase().includes(memberSearch.toLowerCase()) ||
-    c.phone.toLowerCase().includes(memberSearch.toLowerCase()) ||
-    c.notes.toLowerCase().includes(memberSearch.toLowerCase())
-  );
+  // Filter and sort contacts: members first, then alphabetically within each group
+  const filteredContacts = useMemo(() => {
+    if (!group) return [];
+    const memberIds = new Set(group.contactIds || []);
+    
+    return (allContacts || [])
+      .filter(c => 
+        c.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
+        c.email.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        c.phone.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        c.notes.toLowerCase().includes(memberSearch.toLowerCase())
+      )
+      .sort((a, b) => {
+        const aIsMember = memberIds.has(a.id);
+        const bIsMember = memberIds.has(b.id);
+        
+        // Members always come first
+        if (aIsMember && !bIsMember) return -1;
+        if (!aIsMember && bIsMember) return 1;
+        
+        // Within same group (both members or both non-members), sort alphabetically
+        return a.name.localeCompare(b.name);
+      });
+  }, [allContacts, group?.contactIds, memberSearch]);
 
   const updateGroupMutation = useMutation({
     mutationFn: (data: any) => firebaseApi.groups.update(id!, data),
@@ -384,27 +402,73 @@ export default function GroupDetailPage() {
                   />
                 </div>
               </div>
+              
+              <div className="flex items-center justify-between py-2">
+                <p className="text-sm text-muted-foreground">
+                  {(group.contactIds || []).length} member{(group.contactIds || []).length === 1 ? '' : 's'} • {filteredContacts.length} total contact{filteredContacts.length === 1 ? '' : 's'}
+                </p>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredContacts?.map(contact => (
-                  <div 
-                    key={contact.id} 
-                    className="flex items-start space-x-3 p-3 border rounded-md interactive-card group cursor-pointer hover:bg-accent/50 transition-colors"
-                    onClick={() => toggleContact(contact.id)}
-                  >
+                {filteredContacts?.map((contact: any, index: number) => {
+                  const isInGroup = (group.contactIds || []).includes(contact.id);
+                  const previousContact = index > 0 ? filteredContacts[index - 1] : null;
+                  const previousWasInGroup = previousContact ? (group.contactIds || []).includes(previousContact.id) : false;
+                  
+                  // Show "Current Members" header before first member
+                  const showMemberHeader = index === 0 && isInGroup;
+                  // Show "Available Contacts" divider when transitioning from members to non-members
+                  const showDivider = previousWasInGroup && !isInGroup;
+                  
+                  return (
+                    <React.Fragment key={contact.id}>
+                      {showMemberHeader && (
+                        <div className="col-span-full">
+                          <div className="flex items-center gap-3 py-2 pb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 rounded-full bg-primary"></div>
+                              <p className="text-sm font-semibold text-primary uppercase tracking-wider">Current Members</p>
+                            </div>
+                            <div className="flex-1 h-px bg-primary/20"></div>
+                          </div>
+                        </div>
+                      )}
+                      {showDivider && (
+                        <div className="col-span-full">
+                          <div className="flex items-center gap-3 py-4">
+                            <div className="flex-1 h-px bg-border"></div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Available Contacts</p>
+                            <div className="flex-1 h-px bg-border"></div>
+                          </div>
+                        </div>
+                      )}
+                      <div 
+                        className={`flex items-start space-x-3 p-3 border rounded-md interactive-card group cursor-pointer hover:bg-accent/50 transition-colors ${
+                          isInGroup ? 'border-primary/40 bg-primary/5' : ''
+                        }`}
+                        onClick={() => toggleContact(contact.id)}
+                      >
                     <Checkbox 
                       id={`contact-${contact.id}`} 
-                      checked={(group.contactIds || []).includes(contact.id)}
+                      checked={isInGroup}
                       onCheckedChange={() => toggleContact(contact.id)}
-                      className="hover-scale"
-                      onClick={(e) => e.stopPropagation()} // Prevent double-clicking
+                      className="hover-scale mt-0.5"
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div className="grid gap-1.5 leading-none flex-1">
-                      <label
-                        htmlFor={`contact-${contact.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 hover:text-primary transition-colors"
-                      >
-                        {contact.name}
-                      </label>
+                      <div className="flex items-center gap-2">
+                        <label
+                          htmlFor={`contact-${contact.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 hover:text-primary transition-colors"
+                        >
+                          {contact.name}
+                        </label>
+                        {isInGroup && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/20 text-primary">
+                            Member
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{contact.email}</p>
                       <p className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{contact.phone}</p>
                       {contact.notes && (
@@ -412,7 +476,9 @@ export default function GroupDetailPage() {
                       )}
                     </div>
                   </div>
-                ))}
+                </React.Fragment>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

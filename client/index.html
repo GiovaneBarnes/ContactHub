@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>ContactHub - AI-Powered Contact Management</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://*.googletagmanager.com; img-src 'self' data: https: blob:; connect-src 'self' *;" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://*.googletagmanager.com https://apis.google.com https://*.googleapis.com https://accounts.google.com https://alcdn.msauth.net https://*.msauth.net; frame-src 'self' https://*.google.com https://*.googleapis.com https://accounts.google.com https://contacthub-29950.firebaseapp.com https://login.microsoftonline.com https://*.microsoft.com https://*.live.com; img-src 'self' data: https: blob:; connect-src 'self' *;" />
 
     <meta property="og:title" content="ContactHub - AI-Powered Contact Management" />
     <meta property="og:description" content="Manage your contacts, groups, and automated messaging with AI-powered insights." />
@@ -17,9 +17,19 @@
     <meta name="twitter:image" content="/opengraph.jpg" />
 
     <link rel="icon" type="image/png" href="/favicon.png" />
+    
+    <!-- Performance: Preconnect to critical origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://firebaseapp.com" crossorigin>
+    <link rel="preconnect" href="https://googleapis.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    
+    <!-- Performance: Font loading with display swap -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
+    
+    <!-- Performance: Preload critical resources -->
+    <link rel="modulepreload" href="/src/main.tsx">
   </head>
   <body>
     <div id="root"></div>

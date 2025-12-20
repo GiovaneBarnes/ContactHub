@@ -45,13 +45,21 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
+      // Performance: stale-while-revalidate pattern
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: true, // Enable to catch updates
+      refetchOnReconnect: true,
+      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh
+      gcTime: 10 * 60 * 1000, // 10 minutes - cache lifetime (renamed from cacheTime)
+      retry: 1, // Retry once on failure
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      // Network mode for better offline handling
+      networkMode: 'online',
     },
     mutations: {
-      retry: false,
+      retry: 1,
+      retryDelay: 1000,
+      networkMode: 'online',
     },
   },
 });

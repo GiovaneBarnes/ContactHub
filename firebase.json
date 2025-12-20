@@ -20,7 +20,7 @@
       ]
     },
     {
-      "site": "contact-hub-net",
+      "site": "contacthub-net",
       "public": "dist/public",
       "ignore": [
         "firebase.json",

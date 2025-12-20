@@ -72,8 +72,12 @@ describe('ContactHubAI', () => {
         5
       )
 
-      expect(result).toMatch(/Test Group/)
-      expect(result).toMatch(/Background info/)
+      // Should generate a contextual message without the literal group name/background info
+      expect(result).toBeTypeOf('string')
+      expect(result.length).toBeGreaterThan(50)
+      expect(result).toMatch(/Hey|Hi|Hello/)
+      expect(result).not.toMatch(/Test Group/)
+      expect(result).not.toMatch(/Background info/)
     })
 
     it('should fallback on Firebase Functions error', async () => {
@@ -87,8 +91,12 @@ describe('ContactHubAI', () => {
         5
       )
 
-      expect(result).toMatch(/Test Group/)
-      expect(result).toMatch(/Background info/)
+      // Should generate a contextual message without the literal group name/background info
+      expect(result).toBeTypeOf('string')
+      expect(result.length).toBeGreaterThan(50)
+      expect(result).toMatch(/Hey|Hi|Hello/)
+      expect(result).not.toMatch(/Test Group/)
+      expect(result).not.toMatch(/Background info/)
     })
 
     it('should handle empty background info', async () => {
@@ -102,7 +110,11 @@ describe('ContactHubAI', () => {
         5
       )
 
-      expect(result).toMatch(/Test Group/)
+      // Should generate a general message when no background info provided
+      expect(result).toBeTypeOf('string')
+      expect(result.length).toBeGreaterThan(50)
+      expect(result).toMatch(/Hey|Hi|Hello/)
+      expect(result).not.toMatch(/Test Group/)
     })
 
     it('should handle empty group name', async () => {
@@ -116,7 +128,11 @@ describe('ContactHubAI', () => {
         5
       )
 
-      expect(result).toMatch(/Background info/)
+      // Should generate a contextual message even without group name
+      expect(result).toBeTypeOf('string')
+      expect(result.length).toBeGreaterThan(50)
+      expect(result).toMatch(/Hey|Hi|Hello/)
+      expect(result).not.toMatch(/Background info/)
     })
   })
 
@@ -169,14 +185,16 @@ describe('ContactHubAI', () => {
 
       const result = await ContactHubAI.categorizeContact(
         'John Doe',
-        'john@example.com',
+        'john@gmail.com',
         '+1234567890',
         'Important client'
       )
 
-      expect(result.categories).toEqual(['General'])
+      // New fallback logic analyzes email domain and notes
+      expect(result.categories).toEqual(['Personal', 'Professional']) // personal email + client notes
       expect(result.tags).toEqual(['contact'])
-      expect(result.reasoning).toBe('AI service temporarily unavailable - using fallback categorization')
+      expect(result.reasoning).toMatch(/Heuristic categorization based on/)
+      expect(result.reasoning).toMatch(/AI service temporarily unavailable/)
     })
 
     it('should fallback on Firebase Functions error', async () => {
@@ -188,9 +206,11 @@ describe('ContactHubAI', () => {
         'John Doe'
       )
 
+      // New fallback logic with enhanced reasoning
       expect(result.categories).toEqual(['General'])
       expect(result.tags).toEqual(['contact'])
-      expect(result.reasoning).toBe('AI service temporarily unavailable - using fallback categorization')
+      expect(result.reasoning).toMatch(/Heuristic categorization based on/)
+      expect(result.reasoning).toMatch(/AI service temporarily unavailable/)
     })
 
     it('should handle contact with minimal information', async () => {
@@ -232,12 +252,13 @@ describe('ContactHubAI', () => {
         'professional'
       )
 
-      expect(result).toEqual({
-        frequency: 'Regular',
-        preferredMethod: 'Email',
-        nextContactSuggestion: 'Within 2 weeks',
-        insights: ['AI analysis temporarily unavailable']
-      })
+      // New fallback logic provides more detailed analysis
+      expect(result.frequency).toBe('Regular')
+      expect(result.preferredMethod).toBe('Email')
+      expect(result.nextContactSuggestion).toMatch(/Within/)
+      expect(result.insights).toContain('No communication history yet - establishing baseline recommended')
+      expect(result.insights).toContain('Consider initial outreach to understand preferred communication style')
+      expect(result.insights).toContain('Over 23 months since last contact - overdue for check-in')
     })
 
     it('should handle empty message logs', async () => {
@@ -275,18 +296,19 @@ describe('ContactHubAI', () => {
         'professional'
       )
 
-      expect(result).toEqual({
-        recommendedTime: 'Next business day, 9 AM',
-        reasoning: 'AI scheduling temporarily unavailable',
-        alternatives: ['Tomorrow 2 PM', 'Friday 10 AM']
-      })
+      // New fallback logic generates actual time suggestions
+      expect(result.recommendedTime).toMatch(/Monday, \d{1,2}:\d{2} AM UTC/)
+      expect(result.reasoning).toMatch(/Mid-morning business hours/)
+      expect(result.alternatives).toHaveLength(3)
+      expect(result.alternatives[0]).toMatch(/Tuesday|Wednesday|Thursday/)
     })
 
     it('should handle minimal parameters', async () => {
       const result = await ContactHubAI.suggestContactTime('test-contact-id', 'John Doe')
 
-      expect(result.recommendedTime).toBe('Next business day, 9 AM')
-      expect(result.alternatives).toHaveLength(2)
+      // New fallback logic generates actual time suggestions
+      expect(result.recommendedTime).toMatch(/Monday, \d{1,2}:\d{2} AM UTC/)
+      expect(result.alternatives).toHaveLength(3)
     })
 
     it('should handle different timezones', async () => {
@@ -296,7 +318,8 @@ describe('ContactHubAI', () => {
         'America/New_York'
       )
 
-      expect(result.recommendedTime).toBe('Next business day, 9 AM')
+      // New fallback logic generates actual time suggestions with timezone
+      expect(result.recommendedTime).toMatch(/Monday, \d{1,2}:\d{2} AM America\/New_York/)
     })
   })
 

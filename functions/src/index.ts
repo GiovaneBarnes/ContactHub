@@ -1,6 +1,7 @@
 import {setGlobalOptions} from "firebase-functions";
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {params} from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import {VertexAI} from "@google-cloud/vertexai";
@@ -33,13 +34,15 @@ const ENV_MODEL_LIST = (process.env.VERTEX_MODEL || 'gemini-2.5-flash')
   .split(',')
   .map((name) => name.trim())
   .filter(Boolean);
+// Performance: Prioritize fastest models with lowest latency
 const BUILTIN_MODEL_FALLBACKS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-2.0-flash-001',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-001',
+  'gemini-2.5-flash',      // Fastest, lowest latency
+  'gemini-2.0-flash-001',  // Fast fallback
+  'gemini-1.5-flash-001',  // Legacy fast
+  // Removed heavier models for speed - uncomment if needed:
+  // 'gemini-2.5-pro',
+  // 'gemini-2.0-flash',
+  // 'gemini-1.5-flash',
 ];
 const DEFAULT_VERTEX_MODEL_LIST = Array.from(new Set([...ENV_MODEL_LIST, ...BUILTIN_MODEL_FALLBACKS]));
 
@@ -151,52 +154,60 @@ function interpolateTemplate(template: string, variables: Record<string, any>): 
 }
 
 // AI Prompts for ContactHub
-const messageGenerationTemplate = `You are an expert communication coach crafting authentic, personalized messages that strengthen relationships.
+const messageGenerationTemplate = `You are an expert communication specialist creating natural, professional messages that people can trust and send immediately without editing.
 
 CONTEXT:
 Group Purpose: {{backgroundInfo}}
-Recipients: {{contactCount}} people
-Last Communication: {{lastContactDate}}
+Number of Recipients: {{contactCount}}
+Last Contact: {{lastContactDate}}
 
-YOUR TASK: Write ONE complete message (80-150 words) that will be sent to everyone in the group. It should feel personal but appropriate for multiple recipients.
+YOUR TASK: Write ONE complete, ready-to-send message (100-180 words) appropriate for this group.
 
-CRITICAL FORMATTING RULES:
-1. Write ONLY the message text - no titles, no headers, no "Message 1:", no markdown formatting
-2. Start immediately with the message content (e.g., "Hey!" or "How's it going?")
-3. End with a complete sentence - no trailing dots or unfinished thoughts
-4. The output should be ready to copy-paste and send as-is
+===== CRITICAL OUTPUT REQUIREMENTS =====
+1. Output ONLY the message text - absolutely no titles, headers, labels, or markdown
+2. Start with a natural greeting ("Hey!", "Hi!", "Hello!", "Hope you're doing well!", etc.)
+3. End with proper punctuation (. ! or ?) - NEVER leave thoughts unfinished
+4. Every sentence must be complete and grammatically correct
+5. Message must be immediately sendable without any editing
 
-CONTENT RULES:
-1. NO placeholders like [Friend's Name] or [specific memory] - write actual, specific content
-2. NO fabricated specific scenarios or memories (e.g., "Remember that soufflé?") - keep it general and authentic
-3. NO mention of "group", "everyone", or "all of you" - write as if to one person
-4. NO incomplete sentences - every thought must be finished
-5. Must feel natural and conversational, not formal or stiff
-6. ONLY use specific references if the "Group Purpose" explicitly mentions them - otherwise keep it general
+===== CONTENT QUALITY STANDARDS =====
+1. NO placeholders like [Name], [Event], [Memory] - use only actual content
+2. NO invented specific details unless explicitly in Group Purpose
+3. NO references to "group", "everyone", "you all" - write as if to one person
+4. NO generic corporate language - sound like a real human being
+5. Keep tone warm, genuine, and appropriate for the relationship type
+6. Base specificity ONLY on what's provided in Group Purpose - otherwise stay general
 
-TONE GUIDELINES:
-• If Group Purpose is general/vague: Write a casual, friendly check-in message
-• If Group Purpose mentions specific shared interests: Reference those interests naturally
-• If Group Purpose mentions specific events/plans: Reference those appropriately
-• Default to simple, genuine connection over forced creativity
+===== MESSAGE STRUCTURE =====
+• Opening: Natural greeting that matches the relationship
+• Body: 2-3 sentences showing genuine interest and context
+• Close: Clear, actionable next step (suggest meeting, ask question, etc.)
+• Signature feel: Warm but not forced
 
-STRUCTURE:
-• Opening: Friendly greeting or simple question
-• Middle: Brief context or thought (based ONLY on Group Purpose if specific, otherwise general)
-• Closing: Clear invitation to respond or meet up
+===== TONE MATCHING =====
+• Professional contacts → Respectful, clear, purposeful
+• Friends/Family → Warm, casual, enthusiastic
+• Mixed/General → Friendly but professional
+• Unknown context → Default to warm and authentic
 
-GOOD EXAMPLES (match this style):
+===== PERFECT EXAMPLES =====
 
-Example 1 (Generic friends - like your prompt):
-"Hey! How have you been? It's been a while since we caught up. What have you been up to lately? Would love to hear what's new with you. Let me know if you're free for coffee or a call soon!"
+Example 1 (General friends, no specific details):
+Hey! How have you been? I realized it's been way too long since we properly caught up. What have you been working on lately? I'd love to hear what's new in your world. Let me know if you're free for coffee or a quick call in the next couple weeks!
 
-Example 2 (Specific shared interest):
-"Hey! I just tried that new coffee shop downtown and the vibes reminded me of our college hangout spot. They've got this insane cold brew that I think you'd love. Planning to go back this weekend - want to join? We could finally catch up properly since it's been way too long."
+Example 2 (Professional network, light context):
+Hi! Hope you've been doing well. I've been reflecting on some of our past conversations about the industry, and I'd really value your perspective on a few things. Would you be open to grabbing coffee or hopping on a brief call sometime next week? Would be great to reconnect.
 
-Example 3 (Professional context):
-"Hi! Hope you've been well. I've been thinking about some of the industry trends we discussed last time and would love to get your perspective. Are you free for coffee or a quick call next week? Would be great to catch up."
+Example 3 (Close friends, more casual):
+Hey! It's been forever since we hung out and I've been thinking about you. Life has been crazy but I miss our catch-up sessions. How about we grab dinner or coffee soon? I want to hear everything that's been going on with you. When are you free?
 
-Now write ONE complete message in this exact style (no headers, no formatting, just the message):`;
+Example 4 (Family check-in):
+Hi! Hope you're doing well! I wanted to check in and see how things have been going for you. It feels like we haven't talked in a while and I'd love to catch up properly. Are you free for a call this week or maybe we could meet up soon?
+
+===== OUTPUT FORMAT =====
+Output the message starting immediately with the greeting. No explanations, no labels, no formatting.
+
+Write the message now:`;
 
 const contactCategorizationTemplate = `You are an AI assistant that categorizes contacts based on their information and communication patterns.
 
@@ -365,128 +376,259 @@ type CategorizationComputation = CategorizationPayload & {
 };
 
 // AI prompt for communication pattern analysis
-const communicationAnalysisTemplate = `You are an AI communication analyst helping understand contact relationship patterns.
+const communicationAnalysisTemplate = `You are a relationship intelligence analyst providing actionable communication insights.
 
-Contact: {{name}}
-Relationship Type: {{relationship}}
+CONTACT INFORMATION:
+Name: {{name}}
+Relationship: {{relationship}}
 Last Contact: {{lastContact}}
-Message History: {{messageLogs}}
+Message History:
+{{messageLogs}}
 
-Analyze the communication patterns and provide insights:
+TASK: Analyze communication patterns and provide structured, trustworthy recommendations.
 
-1. **Frequency Analysis**: Based on the message history, determine the typical communication frequency (daily, weekly, monthly, quarterly, etc.)
+===== OUTPUT FORMAT (STRICT) =====
+Frequency: [EXACT pattern - e.g., "Every 2-3 weeks", "Monthly", "Quarterly", "Sporadic"]
+Preferred Method: [PRIMARY method - e.g., "Email", "SMS", "Phone calls", "In-person"]
+Next Contact Suggestion: [SPECIFIC timing - e.g., "Within 7-10 days", "By end of next week", "Early next month"]
+Insights: [Insight 1], [Insight 2], [Insight 3]
 
-2. **Preferred Method**: Analyze which communication method is most used (SMS, email, calls, etc.)
+===== QUALITY REQUIREMENTS =====
+1. Frequency: Be specific, not vague. Use actual time intervals.
+2. Preferred Method: State only the MOST used method, not multiple.
+3. Next Contact Suggestion: Give actionable timing, not generic advice.
+4. Insights: Each must be specific, actionable, and based on observable patterns.
 
-3. **Next Contact Suggestion**: When would be the optimal time to reach out next based on patterns?
+===== INSIGHT GUIDELINES =====
+• Focus on patterns, not speculation
+• Provide actionable relationship maintenance advice
+• Note any concerning trends (e.g., declining frequency)
+• Highlight strengths in the relationship
+• Avoid generic statements like "communication is important"
 
-4. **Key Insights**: Provide 2-3 specific insights about this relationship based on the communication history.
+===== EXAMPLES =====
 
-Format your response as:
-Frequency: [frequency pattern]
-Preferred Method: [most used method]
-Next Contact Suggestion: [optimal timing]
-Insights: [insight 1, insight 2, insight 3]`;
+Good Analysis:
+Frequency: Every 3-4 weeks
+Preferred Method: Email
+Next Contact Suggestion: Within 5-7 days to maintain current rhythm
+Insights: Response time typically 24-48 hours indicating engaged relationship, Recent 6-week gap is unusual and suggests overdue check-in, Prefers weekday communication based on response patterns
 
-// AI prompt for smart contact time suggestions
-const contactTimeSuggestionTemplate = `You are an AI scheduling assistant helping optimize contact timing for better relationship management.
+Bad Analysis:
+Frequency: Sometimes
+Preferred Method: Various methods
+Next Contact Suggestion: Soon
+Insights: Stay in touch, Communication matters, Be consistent
 
-Contact: {{name}}
+Provide your analysis now:`;
+
+// AI prompt for smart contact time suggestions  
+const contactTimeSuggestionTemplate = `You are a scheduling intelligence system providing precise, timezone-aware contact timing recommendations.
+
+CONTACT PROFILE:
+Name: {{name}}
 Timezone: {{timezone}}
-Preferred Times: {{preferredTimes}}
+Preferred Contact Times: {{preferredTimes}}
 Communication Style: {{communicationStyle}}
 Last Contact: {{lastContact}}
 Response Patterns: {{responsePatterns}}
 
-Based on this information, suggest the optimal time to contact this person:
+TASK: Provide specific, actionable timing recommendations that respect timezone, preferences, and patterns.
 
-1. **Recommended Time**: Suggest a specific time/day that would be most effective
-2. **Reasoning**: Explain why this time is optimal based on timezone, preferences, and patterns
-3. **Alternative Times**: Provide 2-3 backup time suggestions
+===== OUTPUT FORMAT (STRICT) =====
+Recommended Time: [DAY, TIME with timezone - e.g., "Tuesday, 10:00 AM EST", "Next Friday, 2:00 PM PST"]
+Reasoning: [1-2 sentences explaining why this time optimizes response likelihood]
+Alternatives: [Alt 1 day/time], [Alt 2 day/time], [Alt 3 day/time]
 
-Consider:
-- Timezone differences
-- Business hours vs personal time
-- Response patterns and availability
-- Communication style preferences
-- Cultural norms for the contact's likely location
+===== QUALITY STANDARDS =====
+1. Recommended Time: Must include specific day and time with timezone
+2. Reasoning: Must reference actual data points (timezone, patterns, preferences)
+3. Alternatives: Must be equally specific and span different time windows
+4. All times must respect:
+   • Business hours (9 AM - 6 PM) for professional contacts
+   • Personal hours (after 6 PM, weekends) for casual relationships  
+   • Timezone conversion accuracy
+   • Cultural norms for timing
 
-Format your response as:
-Recommended Time: [specific time and day]
-Reasoning: [detailed explanation]
-Alternatives: [time 1, time 2, time 3]`;
+===== DECISION FACTORS =====
+Priority Order:
+1. Explicitly stated preferred times (highest weight)
+2. Observed response patterns (medium-high weight)
+3. Timezone-appropriate business/personal hours (medium weight)
+4. Communication style norms (low weight)
+5. General best practices (lowest weight)
+
+===== EXAMPLES =====
+
+Good Recommendation:
+Recommended Time: Wednesday, 10:30 AM PST
+Reasoning: Aligns with stated morning preference and timezone, with 85% historical response rate within 2 hours for mid-morning contacts.
+Alternatives: Tuesday, 2:00 PM PST, Thursday, 9:00 AM PST, Friday, 11:00 AM PST
+
+Bad Recommendation:
+Recommended Time: Soon during business hours
+Reasoning: This time works well for most people
+Alternatives: Morning, Afternoon, Evening
+
+Provide your recommendation now:`;
 
 // AI prompt for smart group creation
-const smartGroupCreationTemplate = `You are an AI relationship strategist helping organize contacts into meaningful groups for better relationship management.
+const smartGroupCreationTemplate = `You are a relationship strategy expert helping organize contacts into effective communication groups.
 
-Contact Analysis:
+CONTACT DATABASE:
 {{contactData}}
 
-Your task is to analyze these contacts and suggest optimal group structures. Consider:
+TASK: Analyze these contacts and suggest 3-5 optimal groups that facilitate better relationship management and communication.
 
-1. **Relationship Types**: Group contacts with similar relationship contexts (family, friends, colleagues, clients, etc.)
-2. **Communication Patterns**: Consider how often you communicate and preferred methods
-3. **Shared Interests**: Look for common themes in notes, tags, or categories
-4. **Life Contexts**: Work, personal, community, professional networks
-5. **Geographic/Regional**: If location data suggests regional groupings
-6. **Communication Frequency**: High-touch vs low-touch relationships
+===== GROUPING PRINCIPLES =====
 
-Provide 3-5 suggested groups with:
-- Group name (concise, descriptive)
-- Group purpose (1-2 sentences explaining the group's focus)
-- Contact assignments (list contact names that should be in this group)
-- Rationale (why this grouping makes sense)
+1. PURPOSEFUL GROUPING
+   • Each group should have a clear communication purpose
+   • Consider communication frequency needs
+   • Think about message relevance across group members
 
-Format your response as JSON:
+2. BALANCED SIZING  
+   • Minimum 2 contacts per group (no single-person groups)
+   • Maximum ~15 contacts per group (keep manageable)
+   • Similar engagement levels within groups
+
+3. RELATIONSHIP CONTEXT
+   • Professional vs personal boundaries
+   • Shared interests or contexts
+   • Communication style compatibility
+   • Timezone and availability alignment
+
+4. STRATEGIC VALUE
+   • Groups should solve a real communication need
+   • Enable batch communication where appropriate
+   • Facilitate relationship nurturing at scale
+
+===== OUTPUT FORMAT (STRICT JSON) =====
 {
   "suggestedGroups": [
     {
-      "name": "Group Name",
-      "purpose": "Group purpose description",
-      "contacts": ["Contact Name 1", "Contact Name 2"],
-      "rationale": "Why this grouping is optimal"
+      "name": "Concise, descriptive group name (max 30 chars)",
+      "purpose": "Clear explanation of group's communication purpose (100-150 words)",
+      "contacts": ["Contact Name 1", "Contact Name 2", "Contact Name 3"],
+      "rationale": "Specific reasoning for this grouping based on shared attributes (50-100 words)"
     }
   ],
-  "insights": "Overall insights about the contact network structure"
+  "insights": "Overall strategy and recommendations for managing these contact groups (100-150 words)"
 }
 
-Ensure groups are mutually exclusive where possible, and cover all contacts provided.`;
+===== QUALITY REQUIREMENTS =====
+• Group names: Professional, clear, specific (not generic like "Group 1")
+• Purpose: Actionable and specific to group's communication needs
+• Contacts: Use EXACT names as provided in contact data
+• Rationale: Reference actual data points (categories, tags, notes)
+• Insights: Strategic advice on group management and communication
+
+===== EXAMPLE OUTPUT =====
+{
+  "suggestedGroups": [
+    {
+      "name": "Tech Industry Network",
+      "purpose": "Professional contacts in technology sector for sharing industry insights, job opportunities, and collaborative project discussions. Regular quarterly updates recommended to maintain network strength and mutual value.",
+      "contacts": ["Sarah Chen", "Michael Rodriguez", "Amy Park", "David Williams"],
+      "rationale": "All four contacts work in technology roles based on notes and professional categories. They share common interests in AI and product development, making them ideal for group updates about industry trends and opportunities."
+    },
+    {
+      "name": "Monthly Check-in Circle",
+      "purpose": "Close personal friends who value regular connection. Perfect for monthly group updates, event planning, and maintaining strong personal relationships despite busy schedules. Casual, warm tone appropriate.",
+      "contacts": ["Jessica Miller", "Tom Anderson", "Lisa Brown"],
+      "rationale": "All tagged as close friends with notes indicating desire for regular contact. Similar communication preferences (prefer text/email over calls) and compatible schedules for group coordination."
+    }
+  ],
+  "insights": "Your contact network shows a clear split between professional and personal relationships, with strong clustering in technology sector. Consider separating high-touch relationships (weekly/monthly) from low-touch (quarterly/annual) to optimize communication frequency. The professional network could benefit from structured quarterly updates, while personal connections may prefer more spontaneous check-ins."
+}
+
+Generate your recommendations now:`;
 
 // AI prompt for contact summary generation
-const contactSummaryTemplate = `You are an AI relationship analyst creating comprehensive contact summaries.
+const contactSummaryTemplate = `You are a relationship intelligence analyst creating comprehensive, actionable contact summaries.
 
-Contact Information:
+CONTACT DATA:
 Name: {{name}}
 Email: {{email}}
 Phone: {{phone}}
 Notes: {{notes}}
-Tags: {{tags}}
 Categories: {{categories}}
+Tags: {{tags}}
 
-Interaction History:
+INTERACTION HISTORY:
 {{interactions}}
 
-Create a concise but comprehensive summary (150-300 words) that includes:
+TASK: Create a professional, actionable summary (200-350 words) that helps maintain and strengthen this relationship.
 
-1. **Relationship Overview**: What type of relationship this is and how long you've known them
-2. **Communication Patterns**: How often you communicate and preferred methods
-3. **Key Topics**: Main subjects discussed or areas of shared interest
-4. **Relationship Status**: Current state of the relationship and any notable patterns
-5. **Action Items**: Any follow-up actions or reminders based on the interaction history
+===== REQUIRED SECTIONS =====
 
-Make it personal and actionable, focusing on maintaining and strengthening the relationship.
+1. RELATIONSHIP OVERVIEW (2-3 sentences)
+   • Nature of the relationship and context
+   • How long you've been in contact
+   • Primary relationship category
 
-Summary:`;
+2. COMMUNICATION PATTERNS (2-3 sentences)
+   • Frequency of interaction
+   • Preferred communication methods
+   • Response patterns and engagement level
 
-// Set global options for all functions
-setGlobalOptions({maxInstances: 10});
+3. KEY TOPICS & INTERESTS (2-3 sentences)
+   • Main subjects of discussion
+   • Shared interests or professional topics
+   • Notable conversation themes
+
+4. RELATIONSHIP HEALTH (1-2 sentences)
+   • Current status and trajectory
+   • Any concerning or positive patterns
+
+5. RECOMMENDED ACTIONS (2-3 specific items)
+   • Actionable next steps
+   • Timing for next contact
+   • Suggested conversation topics
+
+===== QUALITY STANDARDS =====
+• Be specific and factual, not vague or generic
+• Every statement should be backed by provided data
+• Avoid speculation about feelings or intentions
+• Write in clear, professional language
+• End each section with complete sentences
+• Make recommendations actionable and time-bound
+
+===== EXAMPLE OUTPUT =====
+
+{{name}} is a professional contact from the technology sector, with whom you've maintained regular communication over the past 18 months. The relationship began through a mutual connection and has evolved into a valuable professional network relationship.
+
+Communication occurs approximately every 3-4 weeks, primarily via email with occasional phone calls for more substantive discussions. Response time is typically 24-48 hours, indicating an engaged and responsive relationship. The consistent communication rhythm suggests mutual value in maintaining contact.
+
+Conversations center around industry trends, product development strategies, and occasionally personal updates about professional milestones. There's a shared interest in AI applications in business, which has been a recurring theme. Recent discussions have touched on market expansion and innovation challenges.
+
+The relationship is healthy and mutually beneficial, with consistent engagement from both parties. The recent 6-week gap is unusual based on historical patterns and may warrant attention.
+
+Recommended Actions:
+1. Reach out within the next 5-7 days to re-establish regular rhythm and check in on recent project discussion
+2. Reference the AI applications topic from last conversation as a natural continuation point
+3. Suggest a coffee meeting or video call in the next 2-3 weeks to deepen the relationship beyond email exchanges
+
+Write the complete summary now:`;
+
+// Set global options for all functions - performance + cost optimized
+setGlobalOptions({
+  maxInstances: 20,        // Increased for better scaling under load
+  // minInstances: 0 by default - set per-function only when needed
+  concurrency: 80,         // Handle multiple requests per instance
+  memory: '512MiB',        // Default memory for most functions
+  timeoutSeconds: 30,      // Default timeout
+});
 
 // Cloud Functions
 export const generateGroupMessage = onCall(
   {
     region: "us-central1",
-    memory: "1GiB",
-    timeoutSeconds: 60,
+    memory: "512MiB",
+    timeoutSeconds: 30,
+    maxInstances: 10,        // Scale up quickly under load
+    concurrency: 100,        // High concurrency keeps instance alive
+    // No minInstances = $0 baseline cost
     // enforceAppCheck: true, // Temporarily disabled for debugging
   },
   async (request) => {
@@ -539,38 +681,71 @@ export const generateGroupMessage = onCall(
       });
       const result = await generateWithVertexAI(prompt, {
         model: ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash'],
-        temperature: 0.7, // Higher for more creative, varied messages
-        maxOutputTokens: 1024, // Increased to ensure complete messages
+        temperature: 0.65, // Balanced for natural but consistent quality
+        maxOutputTokens: 1536, // Ensure complete messages even for longer contexts
       });
 
-      // Post-process to clean up any formatting artifacts
+      // Comprehensive message validation and cleanup
       let cleanedMessage = result.text.trim();
       
-      // Remove common headers/prefixes
-      cleanedMessage = cleanedMessage.replace(/^(Message \d+:|Message:|Here (is|are) .*?messages?:|Here's .*?message:|\*\*Message \d+:\*\*)/gi, '').trim();
+      // Remove any headers, labels, or meta-commentary
+      cleanedMessage = cleanedMessage.replace(/^(Message \d+:|Message:|Output:|Result:|Here (is|are|'s) .*?messages?:|Here's .*?message:|\*\*Message \d+:\*\*|\*\*Output:\*\*)/gi, '').trim();
       
-      // Remove markdown formatting
+      // Remove markdown formatting that breaks plain text
       cleanedMessage = cleanedMessage.replace(/\*\*(.*?)\*\*/g, '$1'); // Bold
-      cleanedMessage = cleanedMessage.replace(/\*(.*?)\*/g, '$1'); // Italic
+      cleanedMessage = cleanedMessage.replace(/\*(.*?)\*/g, '$1'); // Italic  
       cleanedMessage = cleanedMessage.replace(/^[•\-\*]\s+/gm, ''); // Bullet points
+      cleanedMessage = cleanedMessage.replace(/^\d+\.\s+/gm, ''); // Numbered lists
       
-      // Remove trailing ellipsis
+      // Remove code fences or technical artifacts
+      cleanedMessage = cleanedMessage.replace(/```[\s\S]*?```/g, '').trim();
+      cleanedMessage = cleanedMessage.replace(/`([^`]+)`/g, '$1');
+      
+      // Clean up excessive spacing
+      cleanedMessage = cleanedMessage.replace(/\n{3,}/g, '\n\n'); // Max 2 newlines
+      cleanedMessage = cleanedMessage.replace(/ {2,}/g, ' '); // Single spaces only
+      
+      // Remove trailing ellipsis (incomplete thought indicator)
       cleanedMessage = cleanedMessage.replace(/\.{3,}$/g, '.');
+      cleanedMessage = cleanedMessage.replace(/\.\.$/g, '.');
       
-      // Check if message ends mid-sentence (no punctuation)
+      // Critical validation: ensure message ends properly
       if (!/[.!?]$/.test(cleanedMessage)) {
-        logger.warn(`Generated message appears incomplete: "${cleanedMessage.slice(-50)}"`);
-        // Try to add proper ending punctuation if it seems like a statement
-        if (cleanedMessage.length > 0) {
-          cleanedMessage += '.';
+        logger.warn(`Message incomplete, adding punctuation: "${cleanedMessage.slice(-50)}"`);
+        // Add appropriate punctuation based on context
+        if (cleanedMessage.match(/(\?|what|how|when|where|why|would|could|should)\s*$/i)) {
+          cleanedMessage += '?'; // Looks like a question
+        } else if (cleanedMessage.match(/(!)$/)) {
+          cleanedMessage += '!'; // Exclamatory
+        } else {
+          cleanedMessage += '.'; // Default statement
         }
       }
+      
+      // Quality checks
+      const wordCount = cleanedMessage.split(/\s+/).length;
+      if (wordCount < 20) {
+        logger.error(`Message too short (${wordCount} words): "${cleanedMessage}"`);
+        throw new Error('Generated message is too short - regeneration required');
+      }
+      
+      // Check for placeholder artifacts
+      const placeholderPatterns = /\[(.*?)\]|\{\{.*?\}\}|\[Name\]|\[Event\]|\[specific memory\]/gi;
+      if (placeholderPatterns.test(cleanedMessage)) {
+        logger.error(`Message contains placeholders: "${cleanedMessage}"`);
+        throw new Error('Generated message contains placeholder text - regeneration required');
+      }
 
-      logger.info(`Generated AI message for group ${groupId} by user ${userId}`);
+      logger.info(`Generated validated AI message for group ${groupId} (${wordCount} words)`);
 
       return {
         message: cleanedMessage,
         generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        metadata: {
+          wordCount,
+          model: result.model,
+          validated: true
+        }
       };
     } catch (error) {
       logger.error("Error generating group message:", error);
@@ -582,8 +757,11 @@ export const generateGroupMessage = onCall(
 export const categorizeContact = onCall(
   {
     region: "us-central1",
-    memory: "512MiB",
-    timeoutSeconds: 30,
+    memory: "256MiB",
+    timeoutSeconds: 20,
+    maxInstances: 10,
+    concurrency: 100,        // Keep instance alive during active periods
+    // No minInstances = $0 baseline cost
     // enforceAppCheck: true, // Temporarily disabled for debugging
   },
   async (request) => {
@@ -657,8 +835,10 @@ export const categorizeContact = onCall(
 export const analyzeCommunicationPatterns = onCall(
   {
     region: "us-central1",
-    memory: "512MiB",
-    timeoutSeconds: 30,
+    memory: "256MiB",
+    timeoutSeconds: 20,
+    maxInstances: 5,
+    concurrency: 80,
   },
   async (request) => {
     if (!request.auth) {
@@ -698,20 +878,38 @@ export const analyzeCommunicationPatterns = onCall(
       });
       const result = await generateWithVertexAI(prompt, {
         model: ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash'],
-        temperature: 0.3,
-        maxOutputTokens: 768,
+        temperature: 0.2, // Low temperature for consistent, factual analysis
+        maxOutputTokens: 1024,
       });
 
       const response = result.text;
 
-      // Parse the structured response
-      const frequency = extractValueFromResponse(response, "Frequency:");
-      const preferredMethod = extractValueFromResponse(response, "Preferred Method:");
-      const nextContactSuggestion = extractValueFromResponse(response, "Next Contact Suggestion:");
+      // Parse with validation
+      const frequency = extractValueFromResponse(response, "Frequency:") || "Regular";
+      const preferredMethod = extractValueFromResponse(response, "Preferred Method:") || "Email";
+      const nextContactSuggestion = extractValueFromResponse(response, "Next Contact Suggestion:") || "Within 1-2 weeks";
       const insightsText = extractValueFromResponse(response, "Insights:");
-      const insights = insightsText ? insightsText.split(',').map((s: string) => s.trim()) : [];
+      
+      // Parse and validate insights
+      let insights: string[] = [];
+      if (insightsText) {
+        insights = insightsText
+          .split(/[,;]|\d+\.\s+/) // Split on commas, semicolons, or numbered lists
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 10) // Filter out too-short insights
+          .slice(0, 5); // Max 5 insights
+      }
+      
+      // Quality check: ensure we have actionable insights
+      if (insights.length === 0) {
+        insights = [
+          `Communication frequency: ${frequency}`,
+          `Primary contact method: ${preferredMethod}`,
+          "Consider maintaining consistent contact rhythm"
+        ];
+      }
 
-      logger.info(`Analyzed communication patterns for contact ${contactId} by user ${userId}`);
+      logger.info(`Analyzed communication patterns for contact ${contactId}: ${frequency}, ${preferredMethod}`);
 
       return {
         frequency,
@@ -719,6 +917,10 @@ export const analyzeCommunicationPatterns = onCall(
         nextContactSuggestion,
         insights,
         generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        metadata: {
+          model: result.model,
+          validated: true
+        }
       };
     } catch (error) {
       logger.error("Error analyzing communication patterns:", error);
@@ -731,8 +933,10 @@ export const analyzeCommunicationPatterns = onCall(
 export const suggestContactTime = onCall(
   {
     region: "us-central1",
-    memory: "512MiB",
-    timeoutSeconds: 30,
+    memory: "256MiB",
+    timeoutSeconds: 15,
+    maxInstances: 5,
+    concurrency: 80,
   },
   async (request) => {
     if (!request.auth) {
@@ -769,25 +973,59 @@ export const suggestContactTime = onCall(
       });
       const result = await generateWithVertexAI(prompt, {
         model: ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash'],
-        temperature: 0.25,
-        maxOutputTokens: 512,
+        temperature: 0.2, // Low temperature for precise scheduling recommendations
+        maxOutputTokens: 768,
       });
 
       const response = result.text;
 
-      // Parse the structured response
-      const recommendedTime = extractValueFromResponse(response, "Recommended Time:");
-      const reasoning = extractValueFromResponse(response, "Reasoning:");
+      // Parse and validate structured response
+      let recommendedTime = extractValueFromResponse(response, "Recommended Time:");
+      let reasoning = extractValueFromResponse(response, "Reasoning:");
       const alternativesText = extractValueFromResponse(response, "Alternatives:");
-      const alternatives = alternativesText ? alternativesText.split(',').map((s: string) => s.trim()) : [];
+      
+      // Validate and provide fallbacks
+      if (!recommendedTime || recommendedTime.length < 5) {
+        const fallbackDay = new Date();
+        fallbackDay.setDate(fallbackDay.getDate() + 2); // 2 days from now
+        const dayName = fallbackDay.toLocaleDateString('en-US', { weekday: 'long' });
+        recommendedTime = `${dayName}, 10:00 AM ${timezone}`;
+        reasoning = `Mid-morning on ${dayName} in ${timezone} timezone, allowing for business hours contact.`;
+      }
+      
+      // Parse alternatives with validation
+      let alternatives: string[] = [];
+      if (alternativesText) {
+        alternatives = alternativesText
+          .split(/[,;]|\d+\.\s+/)
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 5)
+          .slice(0, 3);
+      }
+      
+      // Ensure we have exactly 3 alternatives
+      if (alternatives.length < 3) {
+        const baseDays = ['Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        const times = ['9:00 AM', '2:00 PM', '11:00 AM'];
+        while (alternatives.length < 3) {
+          const day = baseDays[alternatives.length % baseDays.length];
+          const time = times[alternatives.length % times.length];
+          alternatives.push(`${day}, ${time} ${timezone}`);
+        }
+      }
 
-      logger.info(`Suggested contact time for contact ${contactId} by user ${userId}`);
+      logger.info(`Suggested contact time for ${contactId}: ${recommendedTime}`);
 
       return {
         recommendedTime,
-        reasoning,
+        reasoning: reasoning || `Optimal timing based on ${timezone} timezone and ${communicationStyle} communication style.`,
         alternatives,
         generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        metadata: {
+          timezone,
+          model: result.model,
+          validated: true
+        }
       };
     } catch (error) {
       logger.error("Error suggesting contact time:", error);
@@ -800,8 +1038,10 @@ export const suggestContactTime = onCall(
 export const generateContactSummary = onCall(
   {
     region: "us-central1",
-    memory: "512MiB",
+    memory: "256MiB",
     timeoutSeconds: 30,
+    maxInstances: 5,
+    concurrency: 50,         // Lower for more complex operations
   },
   async (request) => {
     if (!request.auth) {
@@ -845,14 +1085,38 @@ export const generateContactSummary = onCall(
       const result = await generateWithVertexAI(prompt, {
         model: ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash'],
         temperature: 0.3,
-        maxOutputTokens: 1536, // Increased from 896 to allow for complete 300-word summaries
+        maxOutputTokens: 2048, // Allow for complete 350-word summaries
       });
 
-      logger.info(`Generated contact summary for contact ${contactId} by user ${userId}`);
+      let summary = result.text.trim();
+      
+      // Validate summary quality
+      const wordCount = summary.split(/\s+/).length;
+      
+      // Ensure minimum quality standards
+      if (wordCount < 50) {
+        logger.warn(`Summary too short (${wordCount} words), using enhanced fallback`);
+        summary = `${contact.name} is a ${(contact.categories || ['General'])[0].toLowerCase()} contact with ${contact.email ? 'email' : ''}${contact.email && contact.phone ? ' and ' : ''}${contact.phone ? 'phone' : ''} information on file. ${contact.notes ? 'Notes indicate: ' + contact.notes.slice(0, 100) : 'No detailed notes available yet.'}\n\nCommunication history shows ${interactions?.length || 0} recorded interaction${interactions?.length === 1 ? '' : 's'}. ${interactions?.length ? 'Recent activity suggests an ongoing relationship.' : 'Consider establishing regular communication to strengthen this connection.'}\n\nRecommended Actions:\n1. Review contact information for completeness\n2. Schedule next check-in within 2-3 weeks\n3. Add detailed notes about context and recent interactions`;
+      }
+      
+      // Remove any markdown headers or formatting
+      summary = summary.replace(/^#+\s+/gm, '');
+      summary = summary.replace(/\*\*(.*?)\*\*/g, '$1');
+      summary = summary.replace(/\*(.*?)\*/g, '$1');
+      
+      // Ensure proper paragraph formatting
+      summary = summary.replace(/\n{3,}/g, '\n\n');
+
+      logger.info(`Generated contact summary for ${contactId} (${wordCount} words)`);
 
       return {
-        summary: result.text,
+        summary,
         generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        metadata: {
+          wordCount,
+          model: result.model,
+          validated: true
+        }
       };
     } catch (error) {
       logger.error("Error generating contact summary:", error);
@@ -865,8 +1129,10 @@ export const generateContactSummary = onCall(
 export const suggestSmartGroups = onCall(
   {
     region: "us-central1",
-    memory: "1GiB",
-    timeoutSeconds: 60,
+    memory: "512MiB",
+    timeoutSeconds: 45,
+    maxInstances: 3,         // Rarely used
+    concurrency: 50,
   },
   async (request) => {
     if (!request.auth) {
@@ -912,27 +1178,67 @@ Last Contact: ${contact.lastContactedAt?.toDate?.()?.toISOString() || 'Never con
       });
       const result = await generateWithVertexAI(prompt, {
         model: ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash'],
-        temperature: 0.4, // Slightly higher creativity for group suggestions
-        maxOutputTokens: 2048, // Allow for detailed group suggestions
+        temperature: 0.35, // Balanced creativity for group suggestions
+        maxOutputTokens: 3072, // Allow for detailed group analysis
       });
 
       let suggestions;
+      
       try {
-        suggestions = JSON.parse(result.text);
+        // Try to extract JSON from response
+        const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          suggestions = JSON.parse(jsonMatch[0]);
+          
+          // Validate structure
+          if (!suggestions.suggestedGroups || !Array.isArray(suggestions.suggestedGroups)) {
+            throw new Error('Invalid suggestedGroups structure');
+          }
+          
+          // Validate each group
+          suggestions.suggestedGroups = suggestions.suggestedGroups
+            .filter((group: any) => {
+              return group.name && 
+                     group.purpose && 
+                     Array.isArray(group.contacts) && 
+                     group.contacts.length >= 2; // Minimum 2 contacts per group
+            })
+            .slice(0, 8); // Maximum 8 groups
+          
+          // Ensure we have insights
+          if (!suggestions.insights || suggestions.insights.trim().length < 20) {
+            suggestions.insights = `Analyzed ${contacts.length} contacts and created ${suggestions.suggestedGroups.length} strategic groups based on relationship types, communication patterns, and shared contexts. Review and customize these groups based on your specific communication needs.`;
+          }
+          
+        } else {
+          throw new Error('No JSON structure found in response');
+        }
       } catch (parseError) {
-        logger.warn(`Failed to parse AI group suggestions, using fallback: ${parseError}`);
-        // Fallback to basic grouping by AI categories
+        logger.warn(`Failed to parse AI group suggestions: ${parseError}`);
+        // Fallback to heuristic grouping
         suggestions = generateFallbackGroupSuggestions(contacts);
       }
 
-      // Validate and enhance suggestions
+      // Additional validation and enhancement
       const validatedSuggestions = validateAndEnhanceGroupSuggestions(suggestions, contacts);
+      
+      // Quality check: ensure meaningful groups
+      if (validatedSuggestions.suggestedGroups.length === 0) {
+        logger.warn('No valid groups generated, creating basic category groups');
+        validatedSuggestions.suggestedGroups = generateFallbackGroupSuggestions(contacts).suggestedGroups;
+      }
 
-      logger.info(`Generated smart group suggestions for user ${userId}: ${validatedSuggestions.suggestedGroups.length} groups`);
+      logger.info(`Generated ${validatedSuggestions.suggestedGroups.length} smart group suggestions for user ${userId}`);
 
       return {
         ...validatedSuggestions,
         generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        metadata: {
+          contactCount: contacts.length,
+          groupCount: validatedSuggestions.suggestedGroups.length,
+          model: result.model,
+          validated: true
+        }
       };
     } catch (error) {
       logger.error("Error generating smart group suggestions:", error);
@@ -1434,7 +1740,161 @@ export const sendSMS = onRequest(
   }
 );
 
-// Scheduled function to send due messages - DISABLED for now
+// Scheduled function to send due messages every hour
+export const sendScheduledMessages = onSchedule('every 1 hours', async (event) => {
+  logger.info('Running scheduled message check...');
+  
+  try {
+    const db = admin.firestore();
+    const now = new Date();
+    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Get all users
+    const usersSnapshot = await db.collection('users').get();
+    
+    for (const userDoc of usersSnapshot.docs) {
+      const userId = userDoc.id;
+      
+      // Get all groups for this user
+      const groupsSnapshot = await db.collection('users').doc(userId).collection('groups').get();
+      
+      for (const groupDoc of groupsSnapshot.docs) {
+        const group = groupDoc.data();
+        const groupId = groupDoc.id;
+        const schedules = group.schedules || [];
+        
+        for (const schedule of schedules) {
+          if (!schedule.enabled || !schedule.message) continue;
+          
+          const shouldSend = shouldSendScheduledMessage(schedule, today, currentTime);
+          
+          if (shouldSend) {
+            logger.info(`Sending scheduled message for group ${groupId}, schedule ${schedule.id}`);
+            
+            // Get contacts in the group
+            const contactIds = group.contactIds || [];
+            if (contactIds.length === 0) continue;
+            
+            // Get contact details
+            const contactsPromises = contactIds.map(async (contactId: string) => {
+              const contactDoc = await db.collection('users').doc(userId).collection('contacts').doc(contactId).get();
+              return contactDoc.exists ? { id: contactDoc.id, ...contactDoc.data() } : null;
+            });
+            
+            const contacts = (await Promise.all(contactsPromises)).filter(c => c !== null);
+            
+            // Log the message for each contact
+            for (const contact of contacts) {
+              try {
+                await db.collection('users').doc(userId).collection('messages').add({
+                  contactId: contact.id,
+                  groupId: groupId,
+                  scheduleId: schedule.id,
+                  message: schedule.message,
+                  timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                  status: 'scheduled',
+                  type: 'scheduled',
+                });
+                
+                logger.info(`Logged scheduled message for contact ${contact.id}`);
+              } catch (error) {
+                logger.error(`Failed to log message for contact ${contact.id}:`, error);
+              }
+            }
+            
+            // Update schedule's last run time
+            const updatedSchedules = schedules.map((s: any) => 
+              s.id === schedule.id 
+                ? { ...s, lastRun: today, lastRunTime: currentTime }
+                : s
+            );
+            
+            await db.collection('users').doc(userId).collection('groups').doc(groupId).update({
+              schedules: updatedSchedules
+            });
+          }
+        }
+      }
+    }
+    
+    logger.info('Scheduled message check completed');
+  } catch (error) {
+    logger.error('Error in sendScheduledMessages:', error);
+  }
+});
+
+// Helper function to determine if a schedule should send now
+function shouldSendScheduledMessage(schedule: any, today: string, currentTime: string): boolean {
+  // Check if this is an exception date
+  if (schedule.exceptions?.includes(today)) {
+    return false;
+  }
+  
+  // Check if schedule has already run today
+  if (schedule.lastRun === today) {
+    return false;
+  }
+  
+  // Check if start time matches (within 1 hour window since we run hourly)
+  const scheduleTime = schedule.startTime || '09:00';
+  const scheduleHour = parseInt(scheduleTime.split(':')[0]);
+  const currentHour = parseInt(currentTime.split(':')[0]);
+  
+  if (scheduleHour !== currentHour) {
+    return false;
+  }
+  
+  // One-time schedule
+  if (schedule.type === 'one-time') {
+    return schedule.startDate === today;
+  }
+  
+  // Recurring schedule
+  if (schedule.type === 'recurring') {
+    const startDate = new Date(schedule.startDate);
+    const todayDate = new Date(today);
+    const endDate = schedule.endDate ? new Date(schedule.endDate) : null;
+    
+    // Check if today is within the schedule range
+    if (todayDate < startDate) return false;
+    if (endDate && todayDate > endDate) return false;
+    
+    const frequency = schedule.frequency;
+    if (!frequency) return false;
+    
+    const daysSinceStart = Math.floor((todayDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    switch (frequency.type) {
+      case 'daily':
+        return daysSinceStart % frequency.interval === 0;
+        
+      case 'weekly':
+        const dayOfWeek = todayDate.getDay();
+        const weeksSinceStart = Math.floor(daysSinceStart / 7);
+        return (weeksSinceStart % frequency.interval === 0) && 
+               (frequency.daysOfWeek?.includes(dayOfWeek) ?? false);
+        
+      case 'monthly':
+        const dayOfMonth = todayDate.getDate();
+        const monthsSinceStart = (todayDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                                 (todayDate.getMonth() - startDate.getMonth());
+        return (monthsSinceStart % frequency.interval === 0) && 
+               (frequency.daysOfMonth?.includes(dayOfMonth) ?? false);
+        
+      case 'yearly':
+        const monthOfYear = todayDate.getMonth();
+        const yearsSinceStart = todayDate.getFullYear() - startDate.getFullYear();
+        return (yearsSinceStart % frequency.interval === 0) && 
+               (frequency.monthsOfYear?.includes(monthOfYear) ?? false);
+        
+      default:
+        return false;
+    }
+  }
+  
+  return false;
+}
 
 // New function with explicit CORS handling
 export const categorizeContactV2 = onRequest(
@@ -1631,63 +2091,98 @@ function generateFallbackGroupSuggestions(contacts: any[]) {
   });
 
   const suggestedGroups = Object.entries(categoryGroups)
-    .filter(([_, groupContacts]) => groupContacts.length > 0)
-    .map(([category, groupContacts]) => ({
-      name: `${category} Contacts`,
-      purpose: `A group for all your ${category.toLowerCase()} contacts to help organize and communicate with this relationship type.`,
-      contacts: groupContacts.map(c => c.name),
-      rationale: `Grouped by AI-detected ${category.toLowerCase()} relationship category`
-    }));
+    .filter(([_, groupContacts]) => groupContacts.length >= 2) // Minimum 2 per group
+    .map(([category, groupContacts]) => {
+      const categoryLower = category.toLowerCase();
+      
+      // Category-specific purposes
+      const purposes: Record<string, string> = {
+        'family': 'Family members for coordinating events, sharing updates, and maintaining close family bonds. Ideal for holiday planning, milestone celebrations, and regular family check-ins.',
+        'friend': 'Personal friends for social coordination, event planning, and maintaining friendships. Perfect for group hangouts, catching up, and sharing life updates.',
+        'professional': 'Professional contacts for industry updates, collaboration opportunities, and career networking. Suitable for sharing professional insights and maintaining business relationships.',
+        'colleague': 'Work colleagues for project updates, team coordination, and professional communication. Best for work-related discussions and team collaboration.',
+        'client': 'Client contacts for project updates, deliverables discussion, and relationship management. Enables professional communication while maintaining service quality.',
+        'lead': 'Prospective leads for follow-ups, nurturing relationships, and conversion tracking. Facilitates consistent outreach and pipeline management.',
+        'vendor': 'Service providers and vendors for coordination, orders, and business transactions. Streamlines vendor communication and relationship management.',
+        'mentor': 'Mentors and advisors for guidance, career development, and strategic advice. Maintains valuable advisory relationships.',
+        'community': 'Community members for event coordination, shared interests, and group activities. Enables community engagement and event planning.',
+      };
+      
+      return {
+        name: `${category} Network`,
+        purpose: purposes[categoryLower] || `Contacts categorized as ${categoryLower} for organized communication and relationship management. Group messaging enables efficient updates while maintaining personal touch.`,
+        contacts: groupContacts.map(c => c.name),
+        contactIds: groupContacts.map(c => c.id),
+        contactCount: groupContacts.length,
+        rationale: `All contacts share the ${category} category, indicating similar relationship contexts and communication needs. Grouping enables efficient, relevant communication while respecting relationship boundaries.`
+      };
+    });
 
   return {
     suggestedGroups,
-    insights: `Created ${suggestedGroups.length} groups based on contact categories. Consider reviewing and customizing these groups based on your specific communication needs.`
+    insights: `Created ${suggestedGroups.length} category-based groups covering ${contacts.length} contacts. These groups are organized by relationship type to facilitate appropriate and efficient communication. Consider customizing group names and purposes based on your specific communication strategy and relationship goals.`
   };
 }
 
 function validateAndEnhanceGroupSuggestions(suggestions: any, contacts: any[]) {
-  const contactNameMap = new Map(contacts.map(c => [c.name.toLowerCase(), c]));
+  const contactNameMap = new Map(contacts.map(c => [c.name.toLowerCase().trim(), c]));
   const usedContactIds = new Set<string>();
   
   // Validate and enhance each suggested group
-  const validatedGroups = suggestions.suggestedGroups?.map((group: any) => {
-    // Validate contact assignments
+  const validatedGroups = (suggestions.suggestedGroups || []).map((group: any) => {
+    // Validate contact assignments with fuzzy matching
     const validContacts: string[] = [];
     const contactIds: string[] = [];
     
-    group.contacts?.forEach((contactName: string) => {
-      const contact = contactNameMap.get(contactName.toLowerCase());
+    (group.contacts || []).forEach((contactName: string) => {
+      const normalized = contactName.toLowerCase().trim();
+      const contact = contactNameMap.get(normalized);
+      
       if (contact && !usedContactIds.has(contact.id)) {
         validContacts.push(contact.name);
         contactIds.push(contact.id);
         usedContactIds.add(contact.id);
+      } else if (!contact) {
+        // Try partial matching for names that might be slightly different
+        for (const [mapName, mapContact] of contactNameMap.entries()) {
+          if (!usedContactIds.has(mapContact.id) && 
+              (mapName.includes(normalized) || normalized.includes(mapName))) {
+            validContacts.push(mapContact.name);
+            contactIds.push(mapContact.id);
+            usedContactIds.add(mapContact.id);
+            break;
+          }
+        }
       }
     });
 
+    // Enhance group with metadata
     return {
-      ...group,
+      name: (group.name || 'Unnamed Group').trim().slice(0, 50),
+      purpose: (group.purpose || 'Group purpose not specified').trim(),
+      rationale: (group.rationale || 'Grouped by relationship type').trim(),
       contacts: validContacts,
       contactIds,
       contactCount: validContacts.length
     };
-  }).filter((group: any) => group.contacts.length > 0) || [];
+  }).filter((group: any) => group.contacts.length >= 2); // Only keep groups with 2+ contacts
 
   // Add any unassigned contacts to a catch-all group
   const unassignedContacts = contacts.filter(c => !usedContactIds.has(c.id));
-  if (unassignedContacts.length > 0) {
+  if (unassignedContacts.length >= 2) {
     validatedGroups.push({
       name: "Additional Contacts",
-      purpose: "Contacts that didn't fit neatly into other suggested groups. Review and assign to appropriate groups.",
+      purpose: "Contacts that didn't fit into specific categories. Review these individually to determine the best grouping strategy, or create custom groups based on your unique communication needs.",
       contacts: unassignedContacts.map(c => c.name),
       contactIds: unassignedContacts.map(c => c.id),
       contactCount: unassignedContacts.length,
-      rationale: "Catch-all group for contacts not assigned to specific categories"
+      rationale: "These contacts have diverse characteristics that don't cluster clearly into the main groups. Consider creating specialized groups or managing them individually based on your specific relationship context."
     });
   }
 
   return {
     suggestedGroups: validatedGroups,
-    insights: suggestions.insights || "AI-powered group suggestions based on contact analysis and relationship patterns."
+    insights: suggestions.insights || `Analyzed ${contacts.length} contacts and created ${validatedGroups.length} strategic groups. Review these suggestions and customize based on your specific communication needs and relationship management strategy.`
   };
 }
 

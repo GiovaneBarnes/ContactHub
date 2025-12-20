@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import ContactInsightsDrawer from "@/components/contact-insights-drawer";
+import { ContactImportDialog } from "@/components/contact-import-dialog";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -64,8 +65,6 @@ export default function ContactsPage() {
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [importData, setImportData] = useState<any[]>([]);
-  const [importProgress, setImportProgress] = useState(0);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [insightsContact, setInsightsContact] = useState<Contact | null>(null);
   const { toast } = useToast();
@@ -141,7 +140,6 @@ export default function ContactsPage() {
         try {
           const createdContact = await firebaseApi.contacts.create(contact);
           results.push({ success: true, contact: createdContact });
-          setImportProgress((i + 1) / contacts.length * 100);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           results.push({ success: false, contact, error: errorMessage });
@@ -162,12 +160,12 @@ export default function ContactsPage() {
           variant: "destructive"
         });
       }
-      
-      setIsImportOpen(false);
-      setImportData([]);
-      setImportProgress(0);
     }
   });
+
+  const handleContactsImported = (contacts: any[]) => {
+    importMutation.mutate(contacts);
+  };
 
   const form = useForm<z.infer<typeof contactSchema>>({
     resolver: zodResolver(contactSchema),
@@ -215,235 +213,9 @@ export default function ContactsPage() {
     return sanitized;
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      try {
-        let parsedData: any[] = [];
-        
-        if (fileExtension === 'csv') {
-          // Parse CSV
-          const lines = text.split('\n').filter(line => line.trim());
-          const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-          
-          parsedData = lines.slice(1).map(line => {
-            const values = line.split(',').map(v => v.trim());
-            const contact: any = {};
-            
-            headers.forEach((header, index) => {
-              if (values[index]) {
-                if (header.includes('name') || header.includes('fn')) contact.name = values[index];
-                else if (header.includes('email')) contact.email = values[index];
-                else if (header.includes('phone') || header.includes('tel')) contact.phone = values[index];
-                else if (header.includes('notes') || header.includes('description') || header.includes('note')) contact.notes = values[index];
-              }
-            });
-            
-            return contact;
-          });
-        } else if (fileExtension === 'vcf' || fileExtension === 'vcard') {
-          // Parse VCF (vCard)
-          parsedData = parseVCF(text);
-        } else if (fileExtension === 'json') {
-          // Parse JSON
-          const jsonData = JSON.parse(text);
-          parsedData = Array.isArray(jsonData) ? jsonData : [jsonData];
-        }
-        
-        // Validate and sanitize contacts
-        const validContacts: any[] = [];
-        const invalidContacts: any[] = [];
-        const duplicateContacts: any[] = [];
-        const existingContacts = contacts?.map(c => ({ email: c.email?.toLowerCase(), phone: c.phone })) || [];
-
-        parsedData.forEach((contact, index) => {
-          const sanitized = sanitizeContact(contact);
-
-          // Check for required fields
-          if (!sanitized.name || (!sanitized.email && !sanitized.phone)) {
-            invalidContacts.push({ ...sanitized, reason: "Missing name or contact info", row: index + 1 });
-            return;
-          }
-
-          // Validate email if provided
-          if (sanitized.email && !validateEmail(sanitized.email)) {
-            invalidContacts.push({ ...sanitized, reason: "Invalid email format", row: index + 1 });
-            return;
-          }
-
-          // Validate phone if provided
-          if (sanitized.phone && !validatePhone(sanitized.phone)) {
-            invalidContacts.push({ ...sanitized, reason: "Invalid phone format", row: index + 1 });
-            return;
-          }
-
-          // Check for duplicates
-          const isDuplicate = existingContacts.some(existing =>
-            (sanitized.email && existing.email === sanitized.email) ||
-            (sanitized.phone && existing.phone === sanitized.phone)
-          );
-
-          if (isDuplicate) {
-            duplicateContacts.push({ ...sanitized, reason: "Duplicate contact", row: index + 1 });
-            return;
-          }
-
-          validContacts.push(sanitized);
-        });
-
-        // Show validation results
-        if (invalidContacts.length > 0 || duplicateContacts.length > 0) {
-          const totalIssues = invalidContacts.length + duplicateContacts.length;
-          toast({
-            title: `${totalIssues} contact(s) skipped`,
-            description: `${invalidContacts.length} invalid, ${duplicateContacts.length} duplicates. ${validContacts.length} contacts will be imported.`,
-            variant: "default",
-          });
-        }
-
-        if (validContacts.length === 0) {
-          toast({
-            title: "No valid contacts found",
-            description: "Please check your file format and data.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        setImportData(validContacts);
-        toast({ title: `Parsed ${validContacts.length} valid contacts from ${parsedData.length} entries` });
-      } catch (error) {
-        toast({ title: "Import failed", description: "Invalid file format or corrupted file", variant: "destructive" });
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const openInsights = (contact: Contact) => {
     setInsightsContact(contact);
     setIsInsightsOpen(true);
-  };
-
-  const parseVCF = (vcfText: string) => {
-    const contacts: any[] = [];
-    // Split by BEGIN:VCARD and filter out empty entries
-    const vcardBlocks = vcfText.split('BEGIN:VCARD').filter(block => block.trim());
-
-    vcardBlocks.forEach(vcard => {
-      if (!vcard.includes('END:VCARD')) return;
-
-      const contact: any = {};
-      // Split by lines and clean up
-      const lines = vcard.split('\n').map(line => line.trim()).filter(line => line);
-
-      lines.forEach(line => {
-        // Handle different VCF field formats
-        if (line.startsWith('FN:') || line.startsWith('FN;')) {
-          contact.name = line.split(':')[1]?.trim();
-        } else if (line.startsWith('N:') || line.startsWith('N;')) {
-          // Parse N field (Last;First;Middle;Prefix;Suffix)
-          const nParts = line.split(':')[1]?.split(';') || [];
-          if (nParts.length >= 2) {
-            const firstName = nParts[1]?.trim() || '';
-            const lastName = nParts[0]?.trim() || '';
-            if (!contact.name) {
-              contact.name = `${firstName} ${lastName}`.trim();
-            }
-          }
-        } else if (line.startsWith('EMAIL') && line.includes(':')) {
-          const emailValue = line.split(':')[1]?.trim();
-          if (emailValue && !contact.email) { // Take first email found
-            contact.email = emailValue;
-          }
-        } else if (line.startsWith('TEL') && line.includes(':')) {
-          const phoneValue = line.split(':')[1]?.trim();
-          if (phoneValue && !contact.phone) { // Take first phone found
-            contact.phone = phoneValue;
-          }
-        } else if (line.startsWith('NOTE') && line.includes(':')) {
-          contact.notes = line.split(':')[1]?.trim();
-        }
-      });
-
-      // Only add contact if it has a name
-      if (contact.name && contact.name.trim()) {
-        contacts.push(contact);
-      }
-    });
-
-    return contacts;
-  };
-
-  const handleImport = () => {
-    // Check if user is authenticated
-    const auth = getAuth();
-    if (!auth.currentUser) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to import contacts.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (importData.length > 0) {
-      importMutation.mutate(importData);
-    }
-  };
-
-  const downloadSampleCSV = () => {
-    const csvContent = "name,email,phone,notes\nJohn Doe,john@example.com,+1234567890,Colleague\nJane Smith,jane@example.com,+0987654321,Friend";
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_contacts.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadSampleVCF = () => {
-    const vcfContent = `BEGIN:VCARD
-VERSION:3.0
-FN:John Doe
-EMAIL:john@example.com
-TEL:+1234567890
-NOTE:Colleague
-END:VCARD
-BEGIN:VCARD
-VERSION:3.0
-FN:Jane Smith
-EMAIL:jane@example.com
-TEL:+0987654321
-NOTE:Friend
-END:VCARD`;
-    const blob = new Blob([vcfContent], { type: 'text/vcard' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_contacts.vcf';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadSampleJSON = () => {
-    const jsonContent = JSON.stringify([
-      { name: "John Doe", email: "john@example.com", phone: "+1234567890", notes: "Colleague" },
-      { name: "Jane Smith", email: "jane@example.com", phone: "+0987654321", notes: "Friend" }
-    ], null, 2);
-    const blob = new Blob([jsonContent], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_contacts.json';
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const filteredContacts = contacts?.filter(c =>
@@ -451,7 +223,9 @@ END:VCARD`;
     c.email.toLowerCase().includes(search.toLowerCase()) ||
     c.phone.toLowerCase().includes(search.toLowerCase()) ||
     c.notes.toLowerCase().includes(search.toLowerCase())
-  );  const openEdit = (contact: Contact) => {
+  );
+  
+  const openEdit = (contact: Contact) => {
     setEditingContact(contact);
     form.reset(contact);
     setIsOpen(true);
@@ -796,104 +570,11 @@ END:VCARD`;
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Import Contacts</DialogTitle>
-            <DialogDescription>
-              Upload a CSV file to import multiple contacts at once.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={downloadSampleCSV} className="gap-2">
-                <Download className="h-4 w-4" />
-                CSV Sample
-              </Button>
-              <Button variant="outline" size="sm" onClick={downloadSampleVCF} className="gap-2">
-                <Download className="h-4 w-4" />
-                VCF Sample
-              </Button>
-              <Button variant="outline" size="sm" onClick={downloadSampleJSON} className="gap-2">
-                <Download className="h-4 w-4" />
-                JSON Sample
-              </Button>
-              <div className="text-sm text-muted-foreground ml-2">
-                Download samples to see expected formats
-              </div>
-            </div>
-
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-              <input
-                type="file"
-                accept=".csv,.vcf,.vcard,.json"
-                onChange={handleFileImport}
-                className="hidden"
-                id="contact-upload"
-              />
-              <label htmlFor="contact-upload" className="cursor-pointer">
-                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm font-medium">Click to upload contact file</p>
-                <p className="text-xs text-muted-foreground">Supports CSV, VCF (vCard), and JSON files</p>
-              </label>
-            </div>
-
-            {importData.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Preview ({importData.length} contacts)</h4>
-                  {importProgress > 0 && (
-                    <div className="text-sm text-muted-foreground">
-                      Importing... {Math.round(importProgress)}%
-                    </div>
-                  )}
-                </div>
-                
-                <div className="max-h-48 overflow-y-auto border rounded-lg">
-                  <div className="p-3 bg-muted/50 font-medium text-sm grid grid-cols-4 gap-4">
-                    <div>Name</div>
-                    <div>Email</div>
-                    <div>Phone</div>
-                    <div>Notes</div>
-                  </div>
-                  {importData.map((contact, index) => (
-                    <div key={index} className="p-3 border-t text-sm grid grid-cols-4 gap-4">
-                      <div className="truncate">{contact.name}</div>
-                      <div className="truncate">{contact.email}</div>
-                      <div className="truncate">{contact.phone}</div>
-                      <div className="truncate">{contact.notes || '-'}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setImportData([])}>
-                    Clear
-                  </Button>
-                  <Button 
-                    onClick={handleImport} 
-                    disabled={importMutation.isPending}
-                    className="gap-2"
-                  >
-                    {importMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Importing...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4" />
-                        Import {importData.length} Contacts
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContactImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onContactsImported={handleContactsImported}
+      />
 
       <ContactInsightsDrawer
         contact={insightsContact}

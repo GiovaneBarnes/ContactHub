@@ -12,7 +12,8 @@ vi.mock('firebase/app', () => ({
 
 vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(() => ({ type: 'firestore' })),
-  connectFirestoreEmulator: vi.fn()
+  connectFirestoreEmulator: vi.fn(),
+  enableMultiTabIndexedDbPersistence: vi.fn(() => Promise.resolve())
 }))
 
 vi.mock('firebase/auth', () => ({
@@ -25,7 +26,9 @@ vi.mock('firebase/auth', () => ({
       return vi.fn()
     })
   })),
-  connectAuthEmulator: vi.fn()
+  connectAuthEmulator: vi.fn(),
+  setPersistence: vi.fn(() => Promise.resolve()),
+  browserLocalPersistence: vi.fn()
 }))
 
 vi.mock('firebase/functions', () => ({

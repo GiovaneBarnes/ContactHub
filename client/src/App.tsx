@@ -42,6 +42,15 @@ const SettingsPage = lazyRetry(() => import("@/pages/settings"));
 const TermsPage = lazyRetry(() => import("@/pages/terms"));
 const PrivacyPage = lazyRetry(() => import("@/pages/privacy"));
 
+// Preload critical components after initial render
+if (typeof window !== 'undefined') {
+  // Preload Dashboard and Contacts (most used) after 2 seconds
+  setTimeout(() => {
+    import("@/pages/dashboard");
+    import("@/pages/contacts");
+  }, 2000);
+}
+
 // Loading component
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">

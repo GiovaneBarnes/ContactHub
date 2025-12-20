@@ -5,9 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0] - 2025-12-19
+## [1.2.1] - 2025-12-20
 
-### ✨ Added
+### 🐛 Fixed
+- **Test Suite Resolution**: Fixed 21 failing tests across multiple components
+  - **vCard Parser Tests (37 tests)**: Resolved birthday date parsing issues and line folding expectations
+  - **Google Contacts Tests (28 tests)**: Fixed authentication mocking and contact formatting expectations
+  - **Onboarding Wizard Tests (23 tests)**: Corrected contact selection flow and navigation logic
+    - Updated step navigation to properly generate AI messages before proceeding to scheduling
+    - Fixed contact selection expectations (occurs in step 2, displayed in step 4)
+    - Corrected API mocking for scheduling operations
+  - **Syntax and Structure Fixes**: Resolved TypeScript compilation errors and test file formatting
+
+- **Component Logic Corrections**: Enhanced test reliability and component behavior
+  - **Google Contacts Integration**: Fixed CLIENT_ID getter for proper test environment handling
+  - **Onboarding Wizard**: Improved step progression logic and user interaction simulation
+  - **Test Mocking**: Updated Firebase API mocks to match actual implementation
 - **🎯 Interactive Onboarding Wizard**: Complete 3-step guided user experience
   - **Step 1**: Contact creation (manual or CSV import) with immediate value delivery
   - **Step 2**: AI message generation demonstration with live group selection
