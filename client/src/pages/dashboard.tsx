@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { firebaseApi } from "@/lib/firebase-api";
+import { createTimezoneAwareISO, formatWithTimezone, formatInUserTimezone, getDateTimeInputBounds, getUserTimezone } from "@/lib/timezone-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -188,14 +189,16 @@ export default function Dashboard() {
         return;
       }
 
-      const scheduleDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+      const userTimezone = user?.timezone || getUserTimezone();
+      const scheduleDateTime = createTimezoneAwareISO(scheduledDate, scheduledTime, userTimezone);
       const schedule = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'one-time' as const,
         name: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
         message: messageContent,
-        startDate: scheduleDateTime.toISOString().split('T')[0],
+        startDate: scheduleDateTime,
         startTime: scheduledTime,
+        timezone: userTimezone,
         enabled: true
       };
 
@@ -360,10 +363,6 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 bg-emerald-400 rounded-full" />
-                  Free forever plan
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 bg-emerald-400 rounded-full" />
                   Setup in 2 minutes
                 </div>
               </div>
@@ -381,12 +380,9 @@ export default function Dashboard() {
                 <h3 className="text-2xl font-bold mb-4 text-foreground group-hover:text-blue-600 transition-colors">
                   Import Instantly
                 </h3>
-                <p className="text-muted-foreground mb-6 leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed">
                   One-click import from Google, Apple, or any vCard file. Your entire network, ready in seconds. Zero manual entry.
                 </p>
-                <div className="flex items-center text-blue-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                  Learn more →
-                </div>
               </CardContent>
             </Card>
 
@@ -399,12 +395,9 @@ export default function Dashboard() {
                 <h3 className="text-2xl font-bold mb-4 text-foreground group-hover:text-purple-600 transition-colors">
                   AI That Gets You
                 </h3>
-                <p className="text-muted-foreground mb-6 leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed">
                   Smart message generation, automatic categorization, and insights that help you communicate better with everyone.
                 </p>
-                <div className="flex items-center text-purple-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                  Learn more →
-                </div>
               </CardContent>
             </Card>
 
@@ -417,12 +410,9 @@ export default function Dashboard() {
                 <h3 className="text-2xl font-bold mb-4 text-foreground group-hover:text-emerald-600 transition-colors">
                   Automate Everything
                 </h3>
-                <p className="text-muted-foreground mb-6 leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed">
                   Schedule messages, create smart groups, and never miss important connections. Set it once, stay connected forever.
                 </p>
-                <div className="flex items-center text-emerald-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                  Learn more →
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -463,20 +453,21 @@ export default function Dashboard() {
           </div>
 
           {/* Final CTA */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 p-10 text-white text-center animate-slide-up" style={{ animationDelay: '300ms' }}>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 p-6 sm:p-10 text-white text-center animate-slide-up" style={{ animationDelay: '300ms' }}>
             <div className="absolute inset-0 bg-black/10" />
             <div className="relative z-10">
-              <h3 className="text-3xl font-bold mb-4">Ready to transform your contact management?</h3>
-              <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
+              <h3 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">Ready to transform your contact management?</h3>
+              <p className="text-base sm:text-lg text-white/90 mb-4 sm:mb-6 max-w-2xl mx-auto">
                 Join professionals who've automated their networking and never miss a connection.
               </p>
               <Link href="/auth?mode=signup">
-                <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 shadow-2xl hover:shadow-3xl transition-all duration-300 px-10 py-6 text-lg font-semibold">
-                  <UserPlus className="h-5 w-5 mr-2" />
-                  Get Started Free - No Credit Card
+                <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 shadow-2xl hover:shadow-3xl transition-all duration-300 px-6 sm:px-10 py-4 sm:py-6 text-base sm:text-lg font-semibold w-full sm:w-auto">
+                  <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">Get Started Free - No Credit Card</span>
+                  <span className="sm:hidden">Get Started Free</span>
                 </Button>
               </Link>
-              <p className="text-sm text-white/70 mt-4">Already have an account? <Link href="/auth?mode=login"><span className="underline font-medium hover:text-white cursor-pointer">Sign in here</span></Link></p>
+              <p className="text-xs sm:text-sm text-white/70 mt-3 sm:mt-4">Already have an account? <Link href="/auth?mode=login"><span className="underline font-medium hover:text-white cursor-pointer">Sign in here</span></Link></p>
             </div>
           </div>
         </>
@@ -562,7 +553,7 @@ export default function Dashboard() {
                         Sent message to <span className="font-semibold text-primary">{log.groupName}</span>
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(log.timestamp).toLocaleDateString()} at {new Date(log.timestamp).toLocaleTimeString()}
+                        {formatWithTimezone(log.timestamp, user?.timezone)}
                       </p>
                     </div>
                     <div className="ml-auto font-medium text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full border border-border/30">
@@ -597,7 +588,7 @@ export default function Dashboard() {
                         Monthly newsletter scheduled for <span className="font-semibold text-blue-600">VIP Customers</span>
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Tomorrow at 9:00 AM • Recurring campaign
+                        {formatInUserTimezone(new Date(Date.now() + 86400000).toISOString(), 'EEEE', undefined)} at {formatInUserTimezone(new Date(Date.now() + 86400000).toISOString(), 'h:mm a zzz', undefined)} • Recurring campaign
                       </p>
                     </div>
                     <div className="ml-auto font-medium text-xs text-muted-foreground bg-blue-50 px-2 py-1 rounded-full border border-blue-200">
@@ -651,7 +642,7 @@ export default function Dashboard() {
                       Welcome message to <span className="font-semibold text-emerald-600">New Clients</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Tomorrow at 9:00 AM • Automated onboarding
+                      {formatInUserTimezone(new Date(Date.now() + 86400000).toISOString(), 'EEEE', undefined)} at {formatInUserTimezone(new Date(Date.now() + 86400000).toISOString(), 'h:mm a zzz', undefined)} • Automated onboarding
                     </p>
                   </div>
                   <Badge variant="secondary" className="ml-auto bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -667,7 +658,7 @@ export default function Dashboard() {
                       Monthly newsletter to <span className="font-semibold text-blue-600">All Contacts</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Dec 20, 2025 at 10:00 AM • Recurring campaign
+                      {formatInUserTimezone(new Date(Date.now() + 86400000).toISOString(), 'MMM d, yyyy', undefined)} at {formatInUserTimezone(new Date(Date.now() + 86400000).toISOString(), 'h:mm a zzz', undefined)} • Recurring campaign
                     </p>
                   </div>
                   <Badge variant="secondary" className="ml-auto bg-blue-50 text-blue-700 border-blue-200">
@@ -683,7 +674,7 @@ export default function Dashboard() {
                       Holiday greetings to <span className="font-semibold text-purple-600">VIP Customers</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Dec 25, 2025 at 8:00 AM • Seasonal campaign
+                      {formatInUserTimezone(new Date(Date.now() + 518400000).toISOString(), 'MMM d, yyyy', undefined)} at {formatInUserTimezone(new Date(Date.now() + 518400000).toISOString(), 'h:mm a zzz', undefined)} • Seasonal campaign
                     </p>
                   </div>
                   <Badge variant="secondary" className="ml-auto bg-purple-50 text-purple-700 border-purple-200">
@@ -837,7 +828,7 @@ export default function Dashboard() {
                       type="date"
                       value={scheduledDate}
                       onChange={(e) => setScheduledDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
+                      min={getDateTimeInputBounds(user?.timezone).minDate}
                     />
                   </div>
 

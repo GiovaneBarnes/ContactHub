@@ -4,7 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getCommonTimezones, getUserTimezone, getTimezoneAbbreviation } from "@/lib/timezone-utils";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,13 +21,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, Key, Trash2, User, Mail, AlertTriangle } from "lucide-react";
+import { Shield, Key, Trash2, User, Mail, AlertTriangle, Bell, Settings as SettingsIcon } from "lucide-react";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useLocation } from "wouter";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import { metricsService } from "@/lib/metrics";
+import NotificationSettings from "@/components/notification-settings";
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -31,6 +37,7 @@ export default function Settings() {
   
   // Profile state
   const [displayName, setDisplayName] = useState(user?.name || "");
+  const [userTimezone, setUserTimezone] = useState(user?.timezone || getUserTimezone());
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   
   // Password change state
@@ -74,6 +81,35 @@ export default function Settings() {
       });
     } finally {
       setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleTimezoneChange = async (newTimezone: string) => {
+    if (!user) return;
+    
+    try {
+      // Update timezone in Firestore
+      await setDoc(doc(db, 'users', user.id), {
+        timezone: newTimezone,
+      }, { merge: true });
+      
+      setUserTimezone(newTimezone);
+      
+      toast({
+        title: "Timezone updated",
+        description: `Your timezone has been set to ${getTimezoneAbbreviation(newTimezone)}`,
+      });
+      
+      await metricsService.trackFeatureUsage("timezone_updated");
+      
+      // Reload page to reflect timezone changes
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Failed to update timezone",
+        variant: "destructive",
+      });
     }
   };
 
@@ -128,7 +164,7 @@ export default function Settings() {
     } catch (error) {
       let errorMessage = "Failed to change password";
       if (error instanceof Error) {
-        if (error.message.includes("wrong-password")) {
+        if (error.message.includes("wrong-password") || error.message.includes("invalid-credential")) {
           errorMessage = "Current password is incorrect";
         } else {
           errorMessage = error.message;
@@ -142,6 +178,46 @@ export default function Settings() {
       });
     } finally {
       setIsChangingPassword(false);
+    }
+  };
+
+  const handleSendPasswordResetEmail = async () => {
+    if (!user?.email) {
+      toast({
+        title: "Email not found",
+        description: "Unable to send reset email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      
+      const actionCodeSettings = {
+        url: 'https://contact-hub.net/',
+        handleCodeInApp: false,
+      };
+      
+      await sendPasswordResetEmail(auth, user.email, actionCodeSettings);
+      
+      toast({
+        title: "Reset email sent!",
+        description: "Check your email for password reset instructions. You'll be logged out for security.",
+      });
+      
+      await metricsService.trackFeatureUsage("password_reset_email_sent");
+      
+      // Log out user after sending reset email
+      setTimeout(() => {
+        logout();
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Failed to send reset email",
+        description: error instanceof Error ? error.message : "Please try again later",
+        variant: "destructive",
+      });
     }
   };
 
@@ -236,8 +312,21 @@ export default function Settings() {
         </p>
       </div>
 
-      {/* Profile Settings */}
-      <Card className="glass hover-lift">
+      <Tabs defaultValue="account" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsTrigger value="account" className="flex items-center gap-2">
+            <SettingsIcon className="h-4 w-4" />
+            Account
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notifications
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="account" className="space-y-6">
+          {/* Profile Settings */}
+          <Card className="glass hover-lift">
         <CardHeader>
           <div className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
@@ -286,6 +375,42 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* Timezone Settings */}
+      <Card className="glass hover-lift">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <SettingsIcon className="h-5 w-5 text-primary" />
+            <CardTitle>Timezone</CardTitle>
+          </div>
+          <CardDescription>
+            Set your timezone for accurate scheduling and notifications
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Your Timezone</Label>
+            <Select value={userTimezone} onValueChange={handleTimezoneChange}>
+              <SelectTrigger id="timezone">
+                <SelectValue placeholder="Select timezone" />
+              </SelectTrigger>
+              <SelectContent>
+                {getCommonTimezones().map(tz => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Auto-detected: {getTimezoneAbbreviation(getUserTimezone())}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              All scheduled messages and notifications will use this timezone
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Password Change */}
       <Card className="glass hover-lift">
         <CardHeader>
@@ -307,6 +432,20 @@ export default function Settings() {
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="Enter current password"
             />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Don't remember your current password?
+              </p>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs"
+                onClick={handleSendPasswordResetEmail}
+              >
+                Send reset email
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -431,6 +570,12 @@ export default function Settings() {
           </AlertDialog>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <NotificationSettings />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

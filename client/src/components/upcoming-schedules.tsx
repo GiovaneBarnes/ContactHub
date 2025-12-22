@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { firebaseApi } from '@/lib/firebase-api';
+import { formatScheduleTime, parseToUserTimezone, createTimezoneAwareISO, getDateTimeInputBounds, getUserTimezone } from '@/lib/timezone-utils';
+import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Edit, Trash2, MessageSquare } from 'lucide-react';
@@ -21,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Schedule } from '@/lib/types';
 
 export function UpcomingSchedules() {
+  const { user } = useAuth();
   const [selectedOccurrence, setSelectedOccurrence] = useState<{
     occurrence: any;
     schedule: Schedule & { groupId?: string };
@@ -74,11 +77,12 @@ export function UpcomingSchedules() {
       // Find the group that contains this schedule
       const group = groups?.find(g => g.schedules.some(s => s.id === schedule.id));
       if (group) {
-      setSelectedOccurrence({ occurrence, schedule: { ...schedule, groupId: group.id }, groupName });
-      setEditedMessage(schedule.message || ''); // Initialize with existing message content
-      setEditedDate(occurrence.date.toISOString().split('T')[0]);
-      setEditedTime(occurrence.date.toTimeString().slice(0, 5)); // HH:MM format
-      setIsEditModalOpen(true);
+        const parsed = parseToUserTimezone(occurrence.date.toISOString(), user?.timezone);
+        setSelectedOccurrence({ occurrence, schedule: { ...schedule, groupId: group.id }, groupName });
+        setEditedMessage(schedule.message || ''); // Initialize with existing message content
+        setEditedDate(parsed.dateString);
+        setEditedTime(parsed.timeString);
+        setIsEditModalOpen(true);
       }
     }
   };
@@ -87,15 +91,14 @@ export function UpcomingSchedules() {
     if (!selectedOccurrence) return;
 
     const updates: Partial<Schedule> = {};
+    const parsed = parseToUserTimezone(selectedOccurrence.occurrence.date.toISOString(), user?.timezone);
 
-    // If date changed, update the schedule
-    if (editedDate !== selectedOccurrence.occurrence.date.toISOString().split('T')[0]) {
-      updates.startDate = editedDate;
-    }
-
-    // If time changed, update the schedule
-    if (editedTime !== selectedOccurrence.occurrence.date.toTimeString().slice(0, 5)) {
+    // If date or time changed, update the schedule with timezone-aware ISO
+    if (editedDate !== parsed.dateString || editedTime !== parsed.timeString) {
+      const userTimezone = user?.timezone || selectedOccurrence.schedule.timezone || getUserTimezone();
+      updates.startDate = createTimezoneAwareISO(editedDate, editedTime, userTimezone);
       updates.startTime = editedTime;
+      updates.timezone = userTimezone;
     }
 
     // If message changed, update the schedule

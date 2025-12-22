@@ -22,6 +22,7 @@ vi.mock('firebase/firestore', () => ({
   deleteDoc: vi.fn(),
   doc: vi.fn(),
   getDocs: vi.fn(),
+  getDoc: vi.fn(() => Promise.resolve({ data: () => ({ timezone: 'UTC' }) })),
   query: vi.fn(() => 'mock-query'),
   where: vi.fn(() => 'mock-where'),
   orderBy: vi.fn(() => 'mock-order'),
@@ -122,7 +123,8 @@ const mockGroup = {
   contactIds: ['contact-1'],
   schedules: [],
   backgroundInfo: 'Test background',
-  enabled: true
+  enabled: true,
+  isSystem: false
 }
 
 const mockDoc = {
@@ -645,7 +647,12 @@ describe('Firebase API', () => {
         data: () => ({
           name: 'Test Group',
           contactIds: ['contact-1'],
-          userId: 'test-user-id'
+          schedules: [],
+          backgroundInfo: 'Test background',
+          enabled: true,
+          userId: 'test-user-id',
+          createdAt: 'server-timestamp',
+          updatedAt: 'server-timestamp'
         })
       }
 

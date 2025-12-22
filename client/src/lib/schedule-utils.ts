@@ -16,11 +16,13 @@ export function getNextOccurrences(schedules: Schedule[], fromDate: Date = new D
     if (!schedule.enabled) continue;
 
     const nextDates = getNextScheduleOccurrences(schedule, fromDate, count);
-    occurrences.push(...nextDates.map(date => ({
-      date,
-      scheduleId: schedule.id,
-      scheduleName: schedule.name
-    })));
+    occurrences.push(...nextDates
+      .filter(date => date && !isNaN(date.getTime())) // Filter out invalid dates
+      .map(date => ({
+        date,
+        scheduleId: schedule.id,
+        scheduleName: schedule.name
+      })));
   }
 
   // Sort by date and return the earliest ones
@@ -38,7 +40,7 @@ function getNextScheduleOccurrences(schedule: Schedule, fromDate: Date, count: n
   switch (schedule.type) {
     case 'one-time':
       const oneTimeDate = combineDateAndTime(schedule.startDate, schedule.startTime);
-      if (oneTimeDate >= fromDate) {
+      if (oneTimeDate >= fromDate && !isNaN(oneTimeDate.getTime())) {
         occurrences.push(oneTimeDate);
       }
       break;
@@ -48,9 +50,13 @@ function getNextScheduleOccurrences(schedule: Schedule, fromDate: Date, count: n
       break;
   }
 
-  // Filter out exceptions
+  // Filter out exceptions and invalid dates
   return occurrences.filter(date =>
-    !schedule.exceptions?.some(exc => new Date(exc).toDateString() === date.toDateString())
+    !isNaN(date.getTime()) &&
+    !schedule.exceptions?.some(exc => {
+      const excDate = new Date(exc);
+      return !isNaN(excDate.getTime()) && excDate.toDateString() === date.toDateString();
+    })
   );
 }
 
@@ -71,7 +77,10 @@ function getRecurringOccurrences(schedule: Schedule, fromDate: Date, count: numb
   }
 
   while (occurrences.length < count && (!schedule.endDate || currentDate <= new Date(schedule.endDate))) {
-    occurrences.push(new Date(currentDate));
+    // Only add valid dates
+    if (!isNaN(currentDate.getTime())) {
+      occurrences.push(new Date(currentDate));
+    }
 
     // Calculate next occurrence
     switch (frequency.type) {
@@ -195,7 +204,7 @@ function getAnnualOccurrences(schedule: Schedule, fromDate: Date, count: number)
       occurrenceDate.setHours(startDate.getHours(), startDate.getMinutes(), 0, 0);
     }
 
-    if (occurrenceDate >= fromDate) {
+    if (occurrenceDate >= fromDate && !isNaN(occurrenceDate.getTime())) {
       occurrences.push(occurrenceDate);
     }
   }
@@ -207,11 +216,25 @@ function getAnnualOccurrences(schedule: Schedule, fromDate: Date, count: number)
  * Combine date string and time string into a Date object
  */
 function combineDateAndTime(dateStr: string, timeStr?: string): Date {
+  // Validate date string
+  if (!dateStr || dateStr.trim() === '') {
+    console.warn('combineDateAndTime: Invalid date string provided:', dateStr);
+    return new Date(); // Return current date as fallback
+  }
+
   const date = new Date(dateStr);
+
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('combineDateAndTime: Invalid date created from string:', dateStr);
+    return new Date(); // Return current date as fallback
+  }
 
   if (timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
-    date.setHours(hours, minutes, 0, 0);
+    if (!isNaN(hours) && !isNaN(minutes)) {
+      date.setHours(hours, minutes, 0, 0);
+    }
   } else {
     // Default to 9 AM if no time specified
     date.setHours(9, 0, 0, 0);
@@ -232,8 +255,13 @@ export function formatSchedule(schedule: Schedule): string {
 
   switch (schedule.type) {
     case 'one-time':
-      const dateStr = new Date(schedule.startDate).toLocaleDateString();
-      return schedule.name ? `${schedule.name} (${dateStr}${timeStr})` : `Once on ${dateStr}${timeStr}`;
+      try {
+        const dateStr = new Date(schedule.startDate).toLocaleDateString();
+        return schedule.name ? `${schedule.name} (${dateStr}${timeStr})` : `Once on ${dateStr}${timeStr}`;
+      } catch (error) {
+        console.warn('formatSchedule: Invalid startDate for one-time schedule:', schedule.startDate);
+        return schedule.name ? `${schedule.name} (Invalid date${timeStr})` : `Once on invalid date${timeStr}`;
+      }
 
     case 'recurring':
       if (!schedule.frequency) return 'Invalid recurring schedule';

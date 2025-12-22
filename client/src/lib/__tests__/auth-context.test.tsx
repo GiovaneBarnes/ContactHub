@@ -19,6 +19,19 @@ vi.mock('firebase/auth', () => ({
   updateProfile: vi.fn(),
 }))
 
+// Mock Firebase Firestore
+vi.mock('firebase/firestore', () => ({
+  doc: vi.fn(),
+  setDoc: vi.fn(),
+  getDoc: vi.fn(() => Promise.resolve({ data: () => ({}) })),
+  collection: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn(),
+  orderBy: vi.fn(),
+  limit: vi.fn(),
+  getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+}))
+
 vi.mock('../firebase', () => ({
   auth: {},
   analytics: { 
@@ -26,7 +39,7 @@ vi.mock('../firebase', () => ({
     options: { projectId: 'test-project' },
     app: { options: { projectId: 'test-project' } }
   },
-  db: { type: 'firestore-mock' }
+  db: {}
 }))
 
 // Mock wouter

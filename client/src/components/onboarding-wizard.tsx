@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { firebaseApi } from "@/lib/firebase-api";
 import { useAuth } from "@/lib/auth-context";
+import { formatWithTimezone } from "@/lib/timezone-utils";
 import { Contact, Group } from "@/lib/types";
 import {
   Dialog,
@@ -560,7 +561,7 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
-        className="max-w-3xl max-h-[90vh] overflow-y-auto [&>button]:hidden"
+        className="max-w-3xl [&>button]:hidden"
       >
         <DialogHeader>
           <div className="flex items-center justify-between mb-2">
@@ -568,13 +569,13 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
               Step {step} of 4
             </Badge>
           </div>
-          <DialogTitle className="text-2xl font-display">
+          <DialogTitle className="text-xl sm:text-2xl font-display">
             {step === 1 && "Welcome to ContactHub! 🎉"}
             {step === 2 && "Create Your First Group 👥"}
             {step === 3 && "Experience AI Magic ✨"}
             {step === 4 && "Schedule Your First Message 📅"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             {step === 1 &&
               "Try our demo to see ContactHub in action instantly, or add your own contacts to get started."}
             {step === 2 &&
@@ -586,11 +587,11 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <Progress value={progress} className="mb-6" />
+        <Progress value={progress} className="mb-4 sm:mb-6" />
 
         {/* STEP 1: Add Contact */}
         {step === 1 && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Highlight Demo Mode */}
             <Card
               className={cn(
@@ -637,18 +638,18 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-2xl mx-auto">
               <Card
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-lg hover:scale-105",
+                  "cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]",
                   contactMethod === "google" &&
-                    "ring-2 ring-primary shadow-lg scale-105"
+                    "ring-2 ring-primary shadow-lg scale-[1.02]"
                 )}
                 onClick={() => setContactMethod("google")}
               >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center h-40">
-                  <div className="relative mb-3">
-                    <Upload className="h-10 w-10 text-primary" />
+                <CardContent className="flex flex-col items-center justify-center p-4 sm:p-6 text-center h-32 sm:h-40">
+                  <div className="relative mb-2 sm:mb-3">
+                    <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                     <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-900 rounded-full p-0.5">
                       <svg className="h-5 w-5" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -658,7 +659,7 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
                       </svg>
                     </div>
                   </div>
-                  <h3 className="font-semibold mb-1">Google Contacts</h3>
+                  <h3 className="font-semibold mb-1 text-sm sm:text-base">Google Contacts</h3>
                   <p className="text-xs text-muted-foreground">
                     Android • Gmail • One-click import
                   </p>
@@ -667,22 +668,22 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
 
               <Card
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-lg hover:scale-105",
+                  "cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]",
                   contactMethod === "apple" &&
-                    "ring-2 ring-primary shadow-lg scale-105"
+                    "ring-2 ring-primary shadow-lg scale-[1.02]"
                 )}
                 onClick={() => setContactMethod("apple")}
               >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center h-40">
-                  <div className="relative mb-3">
-                    <Upload className="h-10 w-10 text-primary" />
+                <CardContent className="flex flex-col items-center justify-center p-4 sm:p-6 text-center h-32 sm:h-40">
+                  <div className="relative mb-2 sm:mb-3">
+                    <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                     <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-900 rounded-full p-0.5">
                       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
                       </svg>
                     </div>
                   </div>
-                  <h3 className="font-semibold mb-1">Apple Contacts</h3>
+                  <h3 className="font-semibold mb-1 text-sm sm:text-base">Apple Contacts</h3>
                   <p className="text-xs text-muted-foreground">
                     iPhone • Mac • Export & upload
                   </p>
@@ -691,13 +692,13 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
 
               <Card
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-lg hover:scale-105",
+                  "cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]",
                   contactMethod === "manual" &&
-                    "ring-2 ring-primary shadow-lg scale-105"
+                    "ring-2 ring-primary shadow-lg scale-[1.02]"
                 )}
                 onClick={() => setContactMethod("manual")}
               >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center h-40">
+                <CardContent className="flex flex-col items-center justify-center p-4 sm:p-6 text-center h-32 sm:h-40">
                   <UserPlus className="h-10 w-10 mb-3 text-primary" />
                   <h3 className="font-semibold mb-1">Create Manually</h3>
                   <p className="text-xs text-muted-foreground">
@@ -738,6 +739,23 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
                           <span>One-time import - we don't store Google credentials</span>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-900 dark:text-blue-100">Limited Beta Access</p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        Google Contacts import is currently in beta with limited slots (100 test users). 
+                        <strong> Interested in early access?</strong> Email us at{" "}
+                        <a href="mailto:contacthubwebapp@gmail.com?subject=Google Contacts Beta Access Request" className="underline font-medium hover:text-blue-900 dark:hover:text-blue-200">
+                          contacthubwebapp@gmail.com
+                        </a>
+                        {" "}to request access.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -929,8 +947,8 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
               </div>
             )}
 
-            <div className="flex justify-between pt-4">
-              <Button variant="ghost" onClick={handleSkipStep}>
+            <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 pt-4">
+              <Button variant="ghost" onClick={handleSkipStep} className="order-2 sm:order-1">
                 Skip for now
               </Button>
               <Button
@@ -1261,18 +1279,19 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
               </div>
             )}
 
-            <div className="flex justify-between pt-4">
-              <Button variant="ghost" onClick={() => setStep(1)}>
+            <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 pt-4">
+              <Button variant="ghost" onClick={() => setStep(1)} className="order-2 sm:order-1">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <div className="flex gap-2">
-                <Button variant="ghost" onClick={handleSkipStep}>
+              <div className="flex gap-2 order-1 sm:order-2">
+                <Button variant="ghost" onClick={handleSkipStep} className="flex-1 sm:flex-none">
                   Skip for now
                 </Button>
                 <Button
                   onClick={handleCreateGroup}
                   disabled={!groupName.trim() || createGroupMutation.isPending}
+                  className="flex-1 sm:flex-none"
                 >
                   {createGroupMutation.isPending ? (
                     <>
@@ -1484,35 +1503,45 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
 
             {generatedMessage && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <Label>Generated Message</Label>
+                <Label htmlFor="edit-message">Generated Message</Label>
                 <div className="mt-2 p-4 bg-muted rounded-lg border">
-                  <div className="flex items-start gap-2 mb-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div className="flex items-start gap-2 mb-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-green-600 dark:text-green-400">
                         Message Generated Successfully!
                       </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Feel free to edit the message below before continuing
+                      </p>
                     </div>
                   </div>
-                  <p className="text-sm whitespace-pre-wrap">{generatedMessage}</p>
+                  <Textarea
+                    id="edit-message"
+                    value={generatedMessage}
+                    onChange={(e) => setGeneratedMessage(e.target.value)}
+                    className="min-h-[150px] bg-background"
+                    placeholder="Edit your message..."
+                  />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  ✨ This message was crafted by AI based on your group's context
+                  ✨ This message was crafted by AI - personalize it to make it yours
                 </p>
               </div>
             )}
 
-            <div className="flex justify-between pt-4">
+            <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 pt-4">
               <Button
                 variant="ghost"
                 onClick={() => setStep(2)}
                 disabled={createContactMutation.isPending}
+                className="order-2 sm:order-1"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <div className="flex gap-2">
-                <Button variant="ghost" onClick={handleSkipStep}>
+              <div className="flex gap-2 order-1 sm:order-2">
+                <Button variant="ghost" onClick={handleSkipStep} className="flex-1 sm:flex-none">
                   Skip for now
                 </Button>
                 <Button
@@ -1521,6 +1550,7 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
                     setStep(4);
                   }}
                   disabled={Boolean((createdGroupId || selectedGroupId) && !generatedMessage)}
+                  className="flex-1 sm:flex-none"
                 >
                   {generatedMessage ? "Continue" : "Skip to Scheduling"}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -1539,10 +1569,11 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
                   <Calendar className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold mb-2">Smart Scheduling</h3>
+                  <h3 className="font-semibold mb-2">Schedule Your Message (Optional)</h3>
                   <p className="text-sm text-muted-foreground">
-                    Schedule your message to be sent automatically at the perfect
-                    time. Set it and forget it!
+                    {generatedMessage 
+                      ? "Set a date and time to automatically send your message, or skip to send it manually later."
+                      : "You can schedule messages later from the Groups page. Click 'Complete Setup' to finish."}
                   </p>
                 </div>
               </div>
@@ -1551,7 +1582,7 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
             {generatedMessage && (
               <div className="space-y-3">
                 <div>
-                  <Label>Your Message</Label>
+                  <Label>Your Message to Send</Label>
                   <div className="mt-2 p-4 bg-muted rounded-lg border">
                     <div className="flex items-center gap-2 mb-2">
                       <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -1569,7 +1600,7 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
                     <div className="flex items-center gap-2 mb-2">
                       <Users className="h-4 w-4 text-green-600" />
                       <p className="text-xs font-medium text-green-900 dark:text-green-100">
-                        Recipients ({selectedContactIds.length} contact{selectedContactIds.length > 1 ? 's' : ''})
+                        Will be sent to {selectedContactIds.length} contact{selectedContactIds.length > 1 ? 's' : ''}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-1">
@@ -1597,83 +1628,120 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="schedule-date">Date</Label>
-                <Input
-                  id="schedule-date"
-                  type="date"
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  min={new Date().toISOString().split("T")[0]}
-                />
-              </div>
-              <div>
-                <Label htmlFor="schedule-time">Time</Label>
-                <Input
-                  id="schedule-time"
-                  type="time"
-                  value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                />
-              </div>
-            </div>
+            {generatedMessage && (
+              <>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs font-medium text-muted-foreground">Choose when to send</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="schedule-date">Date</Label>
+                      <Input
+                        id="schedule-date"
+                        type="date"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        min={new Date().toISOString().split("T")[0]}
+                        placeholder="Select date"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="schedule-time">Time</Label>
+                      <Input
+                        id="schedule-time"
+                        type="time"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        placeholder="Select time"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-            {scheduleDate && scheduleTime && (
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <p className="text-sm">
-                  <strong>Scheduled for:</strong>{" "}
-                  {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString(
-                    "en-US",
-                    {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    }
-                  )}
-                </p>
-              </div>
+                {scheduleDate && scheduleTime && (
+                  <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border-2 border-green-300 dark:border-green-700 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">
+                          Your message will be scheduled!
+                        </p>
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                          Scheduled for: <strong>{formatWithTimezone(
+                            `${scheduleDate}T${scheduleTime}`,
+                            user?.timezone
+                          )}</strong>
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                          You can manage this schedule from the Groups page after completing setup.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!scheduleDate && !scheduleTime && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-blue-900 dark:text-blue-100">
+                          Leave empty to send manually later from the Groups page.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            <div className="flex justify-between pt-4">
+            <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 pt-4">
               <Button
                 variant="ghost"
                 onClick={() => setStep(3)}
                 disabled={scheduleMessageMutation.isPending}
+                className="order-2 sm:order-1"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <div className="flex gap-2">
-                <Button variant="ghost" onClick={handleComplete}>
-                  Skip for now
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (scheduleDate && scheduleTime) {
-                      handleScheduleMessage();
-                    } else {
-                      // If user clicks without filling form, just complete
-                      handleComplete();
-                    }
-                  }}
-                  disabled={scheduleMessageMutation.isPending}
-                >
-                  {scheduleMessageMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Scheduling...
-                    </>
-                  ) : (
-                    <>
-                      <PartyPopper className="mr-2 h-4 w-4" />
-                      Complete Setup
-                    </>
-                  )}
-                </Button>
+              <div className="flex gap-2 order-1 sm:order-2">
+                {scheduleDate && scheduleTime && generatedMessage ? (
+                  <>
+                    <Button variant="ghost" onClick={handleComplete} className="flex-1 sm:flex-none">
+                      Skip Scheduling
+                    </Button>
+                    <Button
+                      onClick={handleScheduleMessage}
+                      disabled={scheduleMessageMutation.isPending}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {scheduleMessageMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Scheduling...
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Schedule & Finish
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={handleComplete}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <PartyPopper className="mr-2 h-4 w-4" />
+                    {generatedMessage ? "Skip Scheduling & Finish" : "Finish Setup"}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -1681,16 +1749,19 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
 
         {/* Completion celebration */}
         {completedSteps.size === 4 && (
-          <div className="mt-4 p-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg border border-green-200 dark:border-green-800 text-center animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <PartyPopper className="h-12 w-12 mx-auto mb-3 text-green-600" />
-            <h3 className="font-semibold text-lg mb-2">
-              Congratulations! 🎉
+          <div className="mt-4 p-4 sm:p-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg border border-green-200 dark:border-green-800 text-center animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <PartyPopper className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 text-green-600" />
+            <h3 className="font-semibold text-base sm:text-lg mb-2">
+              Setup Complete! 🎉
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              You've completed the onboarding and your first scheduled message is
-              ready to go!
+            <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+              {scheduleDate && scheduleTime && generatedMessage
+                ? `Your message is scheduled to send on ${formatWithTimezone(`${scheduleDate}T${scheduleTime}`, user?.timezone)}. You can manage it from the Groups page.`
+                : generatedMessage
+                ? "Your group and message are ready. Visit the Groups page to send it or set up a schedule."
+                : "You're all set! Start managing your contacts and creating groups."}
             </p>
-            <Button onClick={handleComplete} size="lg">
+            <Button onClick={handleComplete} size="lg" className="w-full sm:w-auto">
               Start Using ContactHub
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>

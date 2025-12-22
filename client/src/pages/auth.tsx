@@ -20,13 +20,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Users, MessageSquare, Clock, ArrowLeft } from "lucide-react";
+import { Loader2, Users, MessageSquare, Clock, ArrowLeft, Info } from "lucide-react";
 import { validateEmail, sanitizeInput, rateLimiter, SECURITY_CONFIG } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Check, X } from "lucide-react";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 import { useEffect } from "react";
 
 const loginSchema = z.object({
@@ -62,21 +64,13 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [location] = useLocation();
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
   
   // Get mode from query parameters
   const urlParams = new URLSearchParams(location.split('?')[1]);
   const defaultTab = urlParams.get('mode') === 'signup' ? 'signup' : 'login';
-
-  // Ensure back navigation goes to dashboard
-  useEffect(() => {
-    const handlePopState = () => {
-      // When user clicks back from auth page, redirect to dashboard
-      window.location.href = '/';
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -142,6 +136,53 @@ export default function AuthPage() {
       // Handled by context
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handlePasswordReset() {
+    if (!resetEmail || !validateEmail(resetEmail)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase');
+      
+      const actionCodeSettings = {
+        url: 'https://contact-hub.net/',
+        handleCodeInApp: false,
+      };
+      
+      await sendPasswordResetEmail(auth, resetEmail, actionCodeSettings);
+      
+      toast({
+        title: "Reset email sent!",
+        description: "Check your email for password reset instructions",
+      });
+      
+      setShowForgotPassword(false);
+      setResetEmail("");
+    } catch (error: any) {
+      let errorMessage = "Failed to send reset email";
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = "No account found with this email address";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Too many requests. Please try again later";
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsResetting(false);
     }
   }
 
@@ -235,6 +276,24 @@ export default function AuthPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
+              {/* SMS Temporary Notice */}
+              {!isFeatureEnabled('SMS_ENABLED') && (
+                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-3 mb-6">
+                  <div className="flex gap-2">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-xs text-blue-900 dark:text-blue-100">
+                        SMS Temporarily Unavailable
+                      </h4>
+                      <p className="text-xs text-blue-800 dark:text-blue-200">
+                        Our SMS service is completing carrier verification (expected Dec 23-26). 
+                        <strong> Messages will be sent via email only</strong> until verification completes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <Tabs defaultValue={defaultTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted dark:bg-muted">
                   <TabsTrigger
@@ -252,6 +311,55 @@ export default function AuthPage() {
                 </TabsList>
 
             <TabsContent value="login">
+              {showForgotPassword ? (
+                <div className="space-y-4">
+                  <div className="text-center space-y-2">
+                    <h3 className="font-semibold text-lg">Reset Your Password</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Enter your email and we'll send you a link to reset your password
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-email">Email</Label>
+                      <Input
+                        id="reset-email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        disabled={isResetting}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setShowForgotPassword(false);
+                          setResetEmail("");
+                        }}
+                        disabled={isResetting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600"
+                        onClick={handlePasswordReset}
+                        disabled={isResetting}
+                      >
+                        {isResetting ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>
+                        ) : (
+                          "Send Reset Link"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
                   <FormField
@@ -288,8 +396,19 @@ export default function AuthPage() {
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Sign In
                   </Button>
+                  <div className="text-center">
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="text-sm text-muted-foreground hover:text-primary"
+                      onClick={() => setShowForgotPassword(true)}
+                    >
+                      Forgot your password?
+                    </Button>
+                  </div>
                 </form>
               </Form>
+              )}
             </TabsContent>
 
             <TabsContent value="signup">

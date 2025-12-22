@@ -191,7 +191,7 @@ describe('AIFeatureTour', () => {
     const onComplete = vi.fn();
     renderWithQueryClient(<AIFeatureTour forceOpen={true} onComplete={onComplete} />);
 
-    const skipButton = screen.getByRole('button', { name: /skip tour/i });
+    const skipButton = screen.getByRole('button', { name: /skip/i });
     fireEvent.click(skipButton);
 
     expect(onComplete).toHaveBeenCalled();
@@ -229,7 +229,7 @@ describe('AIFeatureTour', () => {
     renderWithQueryClient(<AIFeatureTour forceOpen={true} />);
 
     // Click Skip Tour button
-    const skipButton = screen.getByRole('button', { name: /skip tour/i });
+    const skipButton = screen.getByRole('button', { name: /skip/i });
     await user.click(skipButton);
 
     expect(metricsService.trackFeatureUsage).toHaveBeenCalledWith(

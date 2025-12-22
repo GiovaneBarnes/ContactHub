@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { formatInUserTimezone } from '@/lib/timezone-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -367,7 +368,7 @@ export default function AnalyticsDashboard() {
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Predicted for: {prediction.predictedDate.toLocaleDateString()}
+                      Predicted for: {formatInUserTimezone(prediction.predictedDate.toISOString(), 'MMM d, yyyy zzz', user?.timezone)}
                     </div>
                   </div>
                 </CardContent>
@@ -388,7 +389,7 @@ export default function AnalyticsDashboard() {
                     <div className="flex items-center space-x-3">
                       <Activity className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <div className="font-medium">{new Date(day.date).toLocaleDateString()}</div>
+                        <div className="font-medium">{formatInUserTimezone(day.date, 'MMM d, yyyy', user?.timezone)}</div>
                         <div className="text-sm text-muted-foreground">
                           {day.logins} logins, {day.messages} messages, {day.aiUsage} AI requests
                         </div>

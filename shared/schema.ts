@@ -25,6 +25,7 @@ export const groups = pgTable("groups", {
   schedules: jsonb("schedules").$type<Schedule[]>().notNull().default([]),
   backgroundInfo: text("background_info").notNull(),
   enabled: boolean("enabled").notNull().default(true),
+  isSystem: boolean("is_system").notNull().default(false),
 });
 
 export const insertGroupSchema = createInsertSchema(groups).pick({
@@ -34,6 +35,7 @@ export const insertGroupSchema = createInsertSchema(groups).pick({
   schedules: true,
   backgroundInfo: true,
   enabled: true,
+  isSystem: true,
 });
 
 export type InsertGroup = z.infer<typeof insertGroupSchema>;

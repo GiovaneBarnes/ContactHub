@@ -1,6 +1,6 @@
 import {setGlobalOptions} from "firebase-functions";
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentDeleted} from "firebase-functions/v2/firestore";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {params} from "firebase-functions";
 import * as logger from "firebase-functions/logger";
@@ -427,28 +427,55 @@ const contactTimeSuggestionTemplate = `You are a scheduling intelligence system 
 
 CONTACT PROFILE:
 Name: {{name}}
-Timezone: {{timezone}}
+Contact's Timezone: {{timezone}}
+User's Timezone: {{userTimezone}}
 Preferred Contact Times: {{preferredTimes}}
 Communication Style: {{communicationStyle}}
 Last Contact: {{lastContact}}
 Response Patterns: {{responsePatterns}}
 
-TASK: Provide specific, actionable timing recommendations that respect timezone, preferences, and patterns.
+TASK: Provide specific, actionable timing recommendations that work for BOTH timezones and respect business/personal hours in BOTH locations.
 
 ===== OUTPUT FORMAT (STRICT) =====
 Recommended Time: [DAY, TIME with timezone - e.g., "Tuesday, 10:00 AM EST", "Next Friday, 2:00 PM PST"]
-Reasoning: [1-2 sentences explaining why this time optimizes response likelihood]
+Reasoning: [Complete 1-2 sentence explanation with proper punctuation]
 Alternatives: [Alt 1 day/time], [Alt 2 day/time], [Alt 3 day/time]
 
-===== QUALITY STANDARDS =====
-1. Recommended Time: Must include specific day and time with timezone
-2. Reasoning: Must reference actual data points (timezone, patterns, preferences)
-3. Alternatives: Must be equally specific and span different time windows
-4. All times must respect:
-   • Business hours (9 AM - 6 PM) for professional contacts
-   • Personal hours (after 6 PM, weekends) for casual relationships  
-   • Timezone conversion accuracy
-   • Cultural norms for timing
+===== ABSOLUTE REQUIREMENTS =====
+1. TIME WINDOWS (MANDATORY):
+   • Professional contacts: ONLY 9:00 AM - 5:00 PM (strict business hours)
+   • Personal contacts: 9:00 AM - 8:00 PM (reasonable waking hours)
+   • NEVER suggest: Before 8 AM, after 8 PM, or midnight (12:00 AM)
+   
+2. DAY SELECTION (MANDATORY):
+   • Professional contacts: Monday-Friday ONLY (NO weekends)
+   • Personal contacts: Any day acceptable
+   • Suggest 1-5 days in the future (not same day, not too far out)
+
+3. ALTERNATIVES (MANDATORY):
+   • Must provide EXACTLY 3 different alternatives
+   • Each alternative must be on a DIFFERENT day
+   • Each alternative must have a DIFFERENT time
+   • NO duplicates allowed
+   • Must follow same time window rules as main recommendation
+
+4. REASONING (MANDATORY):
+   • Must be a complete sentence ending with punctuation (. or !)
+   • Must reference specific factors (timezone, communication style, patterns)
+   • Must be 20-100 words (not truncated)
+
+===== TIME WINDOW REFERENCE =====
+ACCEPTABLE HOURS for Professional:
+• Early Morning: 9:00 AM - 9:30 AM
+• Mid-Morning: 9:30 AM - 11:30 AM ⭐ IDEAL
+• Noon: 12:00 PM - 1:00 PM
+• Early Afternoon: 1:00 PM - 3:00 PM ⭐ IDEAL  
+• Late Afternoon: 3:00 PM - 5:00 PM
+
+UNACCEPTABLE (REJECT):
+• 12:00 AM - 8:59 AM (too early)
+• 5:01 PM - 11:59 PM (too late)
+• Weekends (Saturday/Sunday) for professional
 
 ===== DECISION FACTORS =====
 Priority Order:
@@ -460,15 +487,21 @@ Priority Order:
 
 ===== EXAMPLES =====
 
-Good Recommendation:
-Recommended Time: Wednesday, 10:30 AM PST
-Reasoning: Aligns with stated morning preference and timezone, with 85% historical response rate within 2 hours for mid-morning contacts.
-Alternatives: Tuesday, 2:00 PM PST, Thursday, 9:00 AM PST, Friday, 11:00 AM PST
+PERFECT Recommendation (Professional):
+Recommended Time: Tuesday, 10:30 AM EST
+Reasoning: Mid-morning timing in EST aligns with professional communication norms and avoids early-morning disruption. This translates to 7:30 AM PST for you, allowing morning preparation before outreach.
+Alternatives: Wednesday, 2:00 PM EST, Thursday, 10:00 AM EST, Friday, 3:00 PM EST
 
-Bad Recommendation:
-Recommended Time: Soon during business hours
-Reasoning: This time works well for most people
-Alternatives: Morning, Afternoon, Evening
+PERFECT Recommendation (Personal):
+Recommended Time: Saturday, 11:00 AM EST  
+Reasoning: Late-morning weekend timing respects casual communication style and ensures contact availability during leisurely hours.
+Alternatives: Sunday, 2:00 PM EST, Friday, 6:30 PM EST, Saturday, 4:00 PM EST
+
+TERRIBLE Recommendation (NEVER DO THIS):
+Recommended Time: Sunday, 6:00 AM EST
+Reasoning: Early morning contact in their timezone
+Alternatives: Saturday, 12:00 AM EST, Saturday, 12:00 PM EST, Saturday, 12:00 AM EST
+[PROBLEMS: 6 AM too early! Weekend for professional! Truncated reasoning! Duplicate alternatives! Midnight suggestion!]
 
 Provide your recommendation now:`;
 
@@ -943,13 +976,20 @@ export const suggestContactTime = onCall(
       throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    const {contactId, timezone, preferredTimes, communicationStyle, lastContact, responsePatterns} = request.data;
+    const {contactId, timezone, preferredTimes, communicationStyle, lastContact, responsePatterns, userTimezone} = request.data;
     if (!contactId) {
       throw new HttpsError("invalid-argument", "Contact ID is required");
     }
 
     try {
       const userId = request.auth.uid;
+
+      // Get user timezone if not provided
+      let finalUserTimezone = userTimezone;
+      if (!finalUserTimezone) {
+        const userDoc = await admin.firestore().doc(`users/${userId}`).get();
+        finalUserTimezone = userDoc.data()?.timezone || 'America/New_York'; // Default to EST
+      }
 
       // Get contact data for context
       const contactDoc = await admin.firestore()
@@ -962,69 +1002,262 @@ export const suggestContactTime = onCall(
 
       const contact = contactDoc.data()!;
 
-      // Generate AI time suggestion
-      const prompt = interpolateTemplate(contactTimeSuggestionTemplate, {
+      // Generate AI time suggestion with BOTH timezones
+      const promptVariables = {
         name: contact.name,
-        timezone: timezone || 'UTC',
+        timezone: timezone || 'America/New_York',
+        userTimezone: finalUserTimezone,
         preferredTimes: preferredTimes?.join(', ') || 'Not specified',
         communicationStyle: communicationStyle || 'professional',
         lastContact: lastContact || 'Unknown',
         responsePatterns: responsePatterns?.join(', ') || 'Not available',
+      };
+      
+      logger.info(`Generating timing for ${contactId}:`, {
+        contactTz: promptVariables.timezone,
+        userTz: promptVariables.userTimezone,
+        style: promptVariables.communicationStyle
       });
+      
+      const prompt = interpolateTemplate(contactTimeSuggestionTemplate, promptVariables);
       const result = await generateWithVertexAI(prompt, {
         model: ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash'],
-        temperature: 0.2, // Low temperature for precise scheduling recommendations
-        maxOutputTokens: 768,
+        temperature: 0.1, // Very low temperature for precise, consistent scheduling
+        maxOutputTokens: 2048, // High token limit to prevent truncation of reasoning
       });
 
       const response = result.text;
+      logger.info(`Raw AI timing response for ${contactId}:`, response);
 
-      // Parse and validate structured response
+      // Parse structured response with better extraction
       let recommendedTime = extractValueFromResponse(response, "Recommended Time:");
-      let reasoning = extractValueFromResponse(response, "Reasoning:");
-      const alternativesText = extractValueFromResponse(response, "Alternatives:");
+      let reasoning = extractMultiLineValue(response, "Reasoning:");
+      const alternativesText = extractMultiLineValue(response, "Alternatives:");
       
-      // Validate and provide fallbacks
+      // CRITICAL VALIDATION: Reject obviously bad recommendations
+      const isProfessional = (communicationStyle || '').toLowerCase().includes('professional');
+      
+      const isBadRecommendation = (time: string): boolean => {
+        if (!time || time.length < 10) return true;
+        
+        // Extract hour from time string (e.g., "10:00 AM" -> 10, "2:00 PM" -> 14)
+        const hourMatch = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (hourMatch) {
+          let hour = parseInt(hourMatch[1]);
+          const isPM = hourMatch[3].toUpperCase() === 'PM';
+          
+          // Convert to 24-hour format
+          if (isPM && hour !== 12) hour += 12;
+          if (!isPM && hour === 12) hour = 0;
+          
+          // Reject times outside reasonable hours (before 8 AM or after 8 PM)
+          if (hour < 8 || hour >= 20) {
+            logger.warn(`Rejecting unreasonable hour: ${time} (hour: ${hour})`);
+            return true;
+          }
+        }
+        
+        // Check for weekend if professional
+        if (isProfessional && /(saturday|sunday|sat|sun)/i.test(time)) {
+          logger.warn(`Rejecting weekend time for professional contact: ${time}`);
+          return true;
+        }
+        
+        return false;
+      };
+      
+      // If AI recommendation is bad, use smart fallback
+      if (isBadRecommendation(recommendedTime)) {
+        logger.warn(`AI produced bad recommendation for ${contactId}, using smart fallback`);
+        recommendedTime = '';
+      }
+      
+      // Validate and clean up recommended time
       if (!recommendedTime || recommendedTime.length < 5) {
         const fallbackDay = new Date();
-        fallbackDay.setDate(fallbackDay.getDate() + 2); // 2 days from now
-        const dayName = fallbackDay.toLocaleDateString('en-US', { weekday: 'long' });
-        recommendedTime = `${dayName}, 10:00 AM ${timezone}`;
-        reasoning = `Mid-morning on ${dayName} in ${timezone} timezone, allowing for business hours contact.`;
+        const isProfessional = (communicationStyle || '').toLowerCase().includes('professional');
+        
+        // Find next appropriate day
+        fallbackDay.setDate(fallbackDay.getDate() + 1);
+        if (isProfessional) {
+          while (fallbackDay.getDay() === 0 || fallbackDay.getDay() === 6) {
+            fallbackDay.setDate(fallbackDay.getDate() + 1);
+          }
+        }
+        
+        const dayName = fallbackDay.toLocaleDateString('en-US', { 
+          weekday: 'short', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+        const tzAbbr = timezone.split('/').pop() || timezone;
+        
+        recommendedTime = `${dayName}, ${isProfessional ? '10:00' : '10:00'} AM ${tzAbbr}`;
+        reasoning = isProfessional
+          ? `Mid-morning on the next business day in ${tzAbbr} timezone provides optimal professional outreach timing.`
+          : `Next-day morning in ${tzAbbr} timezone balances availability with timely outreach.`;
+        logger.info(`Using fallback time for ${contactId}: ${recommendedTime}`);
       }
       
-      // Parse alternatives with validation
+      // Parse alternatives with rigorous validation and deduplication
       let alternatives: string[] = [];
       if (alternativesText) {
-        alternatives = alternativesText
-          .split(/[,;]|\d+\.\s+/)
+        // Split by commas, semicolons, or numbered lists
+        const parsedAlts = alternativesText
+          .split(/[,;]|(?:\d+\.)\s+/)
           .map((s: string) => s.trim())
-          .filter((s: string) => s.length > 5)
-          .slice(0, 3);
+          .filter((s: string) => {
+            // Must have meaningful content (day + time + timezone)
+            if (s.length < 10 || !/\d{1,2}:\d{2}\s*(AM|PM)/i.test(s)) return false;
+            
+            // Reject if bad recommendation
+            if (isBadRecommendation(s)) return false;
+            
+            // Reject if duplicate of main recommendation
+            if (s === recommendedTime) return false;
+            
+            return true;
+          });
+        
+        // Deduplicate and validate uniqueness
+        const uniqueAlts = Array.from(new Set(parsedAlts));
+        
+        // Further validate: ensure different days
+        const seenDays = new Set<string>();
+        for (const alt of uniqueAlts) {
+          const dayMatch = alt.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)/i);
+          if (dayMatch) {
+            const day = dayMatch[0].toLowerCase();
+            if (!seenDays.has(day)) {
+              seenDays.add(day);
+              alternatives.push(alt);
+              if (alternatives.length >= 3) break;
+            }
+          }
+        }
       }
       
-      // Ensure we have exactly 3 alternatives
+      // Generate SMART alternatives if we don't have 3 unique ones
       if (alternatives.length < 3) {
-        const baseDays = ['Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-        const times = ['9:00 AM', '2:00 PM', '11:00 AM'];
-        while (alternatives.length < 3) {
-          const day = baseDays[alternatives.length % baseDays.length];
-          const time = times[alternatives.length % times.length];
-          alternatives.push(`${day}, ${time} ${timezone}`);
+        const now = new Date();
+        const isProfessional = (communicationStyle || '').toLowerCase().includes('professional');
+        
+        // Get proper timezone abbreviation
+        const getTimezoneAbbr = (tz: string): string => {
+          try {
+            const date = new Date();
+            const parts = new Intl.DateTimeFormat('en-US', {
+              timeZone: tz,
+              timeZoneName: 'short'
+            }).formatToParts(date);
+            return parts.find(p => p.type === 'timeZoneName')?.value || tz.split('/').pop() || tz;
+          } catch {
+            return tz.split('/').pop() || tz;
+          }
+        };
+        
+        const tzAbbr = getTimezoneAbbr(timezone);
+        
+        logger.info(`Generating ${3 - alternatives.length} fallback alternatives for ${contactId}`);
+        
+        const generateAlternative = (daysAhead: number, hour: number): string => {
+          const date = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+          
+          // Skip weekends for professional
+          if (isProfessional) {
+            while (date.getDay() === 0 || date.getDay() === 6) {
+              date.setDate(date.getDate() + 1);
+            }
+          }
+          
+          const dayName = date.toLocaleDateString('en-US', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+          });
+          const period = hour >= 12 ? 'PM' : 'AM';
+          const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+          return `${dayName}, ${displayHour}:00 ${period} ${tzAbbr}`;
+        };
+        
+        // Professional: spread across weekdays with varied times
+        // Personal: include weekends
+        const fallbackTimes = isProfessional 
+          ? [
+              generateAlternative(2, 14),  // 2 business days, 2 PM
+              generateAlternative(3, 10),  // 3 business days, 10 AM  
+              generateAlternative(4, 15),  // 4 business days, 3 PM
+              generateAlternative(5, 11)   // 5 business days, 11 AM
+            ]
+          : [
+              generateAlternative(1, 18),  // Tomorrow, 6 PM
+              generateAlternative(2, 11),  // 2 days, 11 AM
+              generateAlternative(3, 15),  // 3 days, 3 PM
+              generateAlternative(5, 19)   // 5 days, 7 PM
+            ];
+        
+        // Add fallbacks, ensuring no duplicates
+        for (const fallback of fallbackTimes) {
+          if (alternatives.length >= 3) break;
+          
+          // Check it's not a duplicate
+          if (fallback !== recommendedTime && !alternatives.includes(fallback)) {
+            alternatives.push(fallback);
+          }
         }
       }
 
-      logger.info(`Suggested contact time for ${contactId}: ${recommendedTime}`);
+      logger.info(`Suggested contact time for ${contactId}: ${recommendedTime}, alternatives: ${alternatives.join(', ')}`);
+
+      // Helper function for timezone abbreviation (used throughout)
+      const getTimezoneAbbr = (tz: string): string => {
+        try {
+          const date = new Date();
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            timeZoneName: 'short'
+          }).formatToParts(date);
+          return parts.find(p => p.type === 'timeZoneName')?.value || tz.split('/').pop() || tz;
+        } catch {
+          return tz.split('/').pop() || tz;
+        }
+      };
+      
+      // Ensure reasoning is complete (not truncated)
+      if (!reasoning || reasoning.length < 20) {
+        const isProfessional = (communicationStyle || '').toLowerCase().includes('professional');
+        const tzAbbr = getTimezoneAbbr(timezone);
+        reasoning = isProfessional
+          ? `Mid-morning business hours in ${tzAbbr} timezone aligns with professional communication norms and maximizes engagement likelihood based on typical work patterns.`
+          : `This timing in ${tzAbbr} timezone respects personal communication preferences while ensuring reasonable waking hours for casual outreach.`;
+        logger.warn(`Reasoning was empty or too short for ${contactId}, using fallback`);
+      } else if (!reasoning.match(/[.!?]$/)) {
+        // Reasoning exists but is incomplete (truncated mid-sentence)
+        logger.warn(`Reasoning truncated for ${contactId}, attempting completion: "${reasoning}"`);
+        
+        // Try to complete the sentence intelligently
+        if (reasoning.match(/ensuring|allowing|providing|respecting/i) && reasoning.length > 50) {
+          // Looks like it was cut off while explaining benefits
+          reasoning += ' optimal communication timing.';
+        } else {
+          // Generic completion
+          reasoning += '.';
+        }
+        
+        logger.info(`Completed truncated reasoning: "${reasoning}"`);
+      }
 
       return {
         recommendedTime,
-        reasoning: reasoning || `Optimal timing based on ${timezone} timezone and ${communicationStyle} communication style.`,
+        reasoning,
         alternatives,
         generatedAt: admin.firestore.FieldValue.serverTimestamp(),
         metadata: {
           timezone,
+          userTimezone: finalUserTimezone,
           model: result.model,
-          validated: true
+          validated: true,
+          isProfessional: (communicationStyle || '').toLowerCase().includes('professional')
         }
       };
     } catch (error) {
@@ -1286,6 +1519,153 @@ export const onContactCreated = onDocumentCreated(
   }
 );
 
+// Trigger when a contact is deleted - remove from all groups
+// CRITICAL: This listens to the root /contacts/{contactId} path, not /users/{userId}/contacts/{contactId}
+export const onContactDeleted = onDocumentDeleted(
+  {
+    document: "contacts/{contactId}",
+    region: "us-central1",
+    memory: "512MiB",
+  },
+  async (event) => {
+    const contactId = event.params.contactId;
+    const contactData = event.data?.data();
+    const userId = contactData?.userId;
+    
+    if (!userId) {
+      logger.warn(`Contact ${contactId} deleted but no userId found in data`);
+      return;
+    }
+    
+    logger.info(`Contact ${contactId} deleted for user ${userId}, cleaning up groups...`);
+    
+    try {
+      const db = admin.firestore();
+      
+      // Get all groups for this user (groups are stored at root level with userId field)
+      const groupsSnapshot = await db
+        .collection('groups')
+        .where('userId', '==', userId)
+        .get();
+      
+      const updatePromises: Promise<any>[] = [];
+      
+      for (const groupDoc of groupsSnapshot.docs) {
+        const group = groupDoc.data();
+        const contactIds = group.contactIds || [];
+        
+        // If this contact was in the group, remove it
+        if (contactIds.includes(contactId)) {
+          logger.info(`Removing contact ${contactId} from group ${groupDoc.id}`);
+          
+          const updatedContactIds = contactIds.filter((id: string) => id !== contactId);
+          
+          updatePromises.push(
+            groupDoc.ref.update({
+              contactIds: updatedContactIds,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            })
+          );
+        }
+      }
+      
+      await Promise.all(updatePromises);
+      
+      logger.info(`Successfully cleaned up ${updatePromises.length} groups for deleted contact ${contactId}`);
+    } catch (error) {
+      logger.error(`Error cleaning up groups for deleted contact ${contactId}:`, error);
+      // Don't throw - deletion should succeed even if cleanup fails
+    }
+  }
+);
+
+/**
+ * One-time cleanup function to remove stale contact IDs from all groups
+ * This fixes groups that reference deleted contacts from before the onContactDeleted trigger was fixed
+ * 
+ * Usage: Call this function via Firebase console or HTTP request to clean up existing data
+ * After running once, the fixed onContactDeleted trigger will keep data clean going forward
+ */
+export const cleanupStaleGroupMembers = onCall(
+  {
+    region: "us-central1",
+    memory: "1GiB",
+    timeoutSeconds: 540,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+
+    const userId = request.auth.uid;
+    logger.info(`Starting stale group member cleanup for user ${userId}`);
+
+    try {
+      const db = admin.firestore();
+      
+      // Get all contacts for this user to build a set of valid IDs
+      const contactsSnapshot = await db
+        .collection('contacts')
+        .where('userId', '==', userId)
+        .get();
+      
+      const validContactIds = new Set(contactsSnapshot.docs.map(doc => doc.id));
+      logger.info(`Found ${validContactIds.size} valid contacts for user ${userId}`);
+      
+      // Get all groups for this user
+      const groupsSnapshot = await db
+        .collection('groups')
+        .where('userId', '==', userId)
+        .get();
+      
+      logger.info(`Found ${groupsSnapshot.size} groups to check`);
+      
+      const updatePromises: Promise<any>[] = [];
+      let groupsUpdated = 0;
+      let contactsRemoved = 0;
+      
+      for (const groupDoc of groupsSnapshot.docs) {
+        const group = groupDoc.data();
+        const currentContactIds = group.contactIds || [];
+        
+        // Filter out any contact IDs that don't exist anymore
+        const validGroupContactIds = currentContactIds.filter((id: string) => validContactIds.has(id));
+        const removedCount = currentContactIds.length - validGroupContactIds.length;
+        
+        if (removedCount > 0) {
+          logger.info(`Group "${group.name}" (${groupDoc.id}): Removing ${removedCount} stale contact(s), keeping ${validGroupContactIds.length}`);
+          
+          updatePromises.push(
+            groupDoc.ref.update({
+              contactIds: validGroupContactIds,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            })
+          );
+          
+          groupsUpdated++;
+          contactsRemoved += removedCount;
+        }
+      }
+      
+      await Promise.all(updatePromises);
+      
+      const result = {
+        success: true,
+        totalGroups: groupsSnapshot.size,
+        groupsUpdated,
+        staleContactsRemoved: contactsRemoved,
+        validContactsInDB: validContactIds.size
+      };
+      
+      logger.info(`Cleanup complete for user ${userId}:`, result);
+      return result;
+    } catch (error) {
+      logger.error(`Error cleaning up stale group members for user ${userId}:`, error);
+      throw new HttpsError("internal", "Failed to cleanup stale group members");
+    }
+  }
+);
+
 // Helper functions
 function extractListFromResponse(response: string, prefix: string): string[] {
   const start = response.indexOf(prefix);
@@ -1314,6 +1694,21 @@ function extractValueFromResponse(response: string, prefix: string): string {
   if (end === -1) return response.substring(start + prefix.length).trim();
 
   return response.substring(start + prefix.length, end).trim();
+}
+
+function extractMultiLineValue(response: string, prefix: string): string {
+  const start = response.indexOf(prefix);
+  if (start === -1) return "";
+
+  // Find the next section header (word followed by colon at start of line) or end of text
+  const afterPrefix = response.substring(start + prefix.length);
+  const nextSectionMatch = afterPrefix.match(/\n[A-Z][a-zA-Z\s]+:/);
+  
+  if (nextSectionMatch && nextSectionMatch.index !== undefined) {
+    return afterPrefix.substring(0, nextSectionMatch.index).trim();
+  }
+
+  return afterPrefix.trim();
 }
 
 function sanitizeStringArray(value: any): string[] {
@@ -1642,18 +2037,17 @@ export const sendEmail = onRequest(
       const idToken = authHeader.split('Bearer ')[1];
       const decodedToken = await admin.auth().verifyIdToken(idToken);
 
-      const {to, subject, text, fromName} = req.body;
+      const {to, subject, text} = req.body;
       if (!to || !subject || !text) {
         res.status(400).json({ error: 'To, subject, and text are required' });
         return;
       }
 
-      const displayName = fromName || "Contact Book";
       const senderEmail = decodedToken.email || decodedToken.uid;
       const senderName = decodedToken.name || senderEmail;
       
-      // Enhanced message with sender information
-      const enhancedText = `${text}\n\n---\nSent by: ${senderName} (${senderEmail})\nFrom group: ${displayName}\nVia ContactHub`;
+      // Enhanced message with sender information and branding
+      const enhancedText = `${text}\n\n---\nSent by ${senderName}\n\nManage your contacts at https://contact-hub.net`;
       
       // Create transporter within function using secrets
       const transporter = nodemailer.createTransport({
@@ -1665,9 +2059,9 @@ export const sendEmail = onRequest(
       });
       
       await transporter.sendMail({
-        from: `"${displayName} (ContactHub)" <${EMAIL_USER.value()}>`,
+        from: `"${senderName} via ContactHub" <${EMAIL_USER.value()}>`,
         to,
-        subject: `${subject} - via ContactHub`,
+        subject: subject,
         text: enhancedText,
         replyTo: EMAIL_USER.value(),
       });
@@ -1717,16 +2111,19 @@ export const sendSMS = onRequest(
       const idToken = authHeader.split('Bearer ')[1];
       const decodedToken = await admin.auth().verifyIdToken(idToken);
 
-      const {to, message} = req.body;
+      const {to, message, senderName} = req.body;
       if (!to || !message) {
         res.status(400).json({ error: 'To and message are required' });
         return;
       }
 
+      const fromName = senderName || decodedToken.name || decodedToken.email || 'ContactHub';
+      const enhancedMessage = `${message}\n\n- ${fromName}\n\nManage contacts: https://contact-hub.net`;
+
       const client = twilio(TWILIO_SID.value(), TWILIO_AUTH_TOKEN.value());
       
       await client.messages.create({
-        body: message,
+        body: enhancedMessage,
         from: TWILIO_PHONE_NUMBER.value(),
         to,
       });

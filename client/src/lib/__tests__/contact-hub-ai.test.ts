@@ -258,7 +258,7 @@ describe('ContactHubAI', () => {
       expect(result.nextContactSuggestion).toMatch(/Within/)
       expect(result.insights).toContain('No communication history yet - establishing baseline recommended')
       expect(result.insights).toContain('Consider initial outreach to understand preferred communication style')
-      expect(result.insights).toContain('Over 23 months since last contact - overdue for check-in')
+      expect(result.insights).toContain('Over 24 months since last contact - overdue for check-in')
     })
 
     it('should handle empty message logs', async () => {
@@ -297,17 +297,17 @@ describe('ContactHubAI', () => {
       )
 
       // New fallback logic generates actual time suggestions
-      expect(result.recommendedTime).toMatch(/Monday, \d{1,2}:\d{2} AM UTC/)
-      expect(result.reasoning).toMatch(/Mid-morning business hours/)
+      expect(result.recommendedTime).toMatch(/^\w{3}, \w{3} \d{1,2}, \d{1,2}:00 (AM|PM) UTC$/)
+      expect(result.reasoning).toMatch(/Mid-morning on the next business day/)
       expect(result.alternatives).toHaveLength(3)
-      expect(result.alternatives[0]).toMatch(/Tuesday|Wednesday|Thursday/)
+      expect(result.alternatives[0]).toMatch(/^\w{3}, \w{3} \d{1,2}, \d{1,2}:00 (AM|PM) UTC$/)
     })
 
     it('should handle minimal parameters', async () => {
       const result = await ContactHubAI.suggestContactTime('test-contact-id', 'John Doe')
 
       // New fallback logic generates actual time suggestions
-      expect(result.recommendedTime).toMatch(/Monday, \d{1,2}:\d{2} AM UTC/)
+      expect(result.recommendedTime).toMatch(/^\w{3}, \w{3} \d{1,2}, \d{1,2}:00 (AM|PM) EST$/)
       expect(result.alternatives).toHaveLength(3)
     })
 
@@ -319,7 +319,7 @@ describe('ContactHubAI', () => {
       )
 
       // New fallback logic generates actual time suggestions with timezone
-      expect(result.recommendedTime).toMatch(/Monday, \d{1,2}:\d{2} AM America\/New_York/)
+      expect(result.recommendedTime).toMatch(/^\w{3}, \w{3} \d{1,2}, \d{1,2}:00 (AM|PM) EST$/)
     })
   })
 

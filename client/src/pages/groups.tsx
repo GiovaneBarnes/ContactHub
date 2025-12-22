@@ -32,7 +32,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Users, ArrowRight, Loader2, Trash2, Edit3, CheckSquare, Square, X, Settings, Sparkles } from "lucide-react";
+import { Plus, Users, ArrowRight, Loader2, Trash2, Edit3, CheckSquare, Square, X, Settings, Sparkles, Shield, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { SmartGroupSuggestions } from "@/components/smart-group-suggestions";
@@ -98,6 +98,23 @@ export default function GroupsPage() {
     }
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: firebaseApi.groups.duplicate,
+    onSuccess: (newGroup) => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      toast({ 
+        title: "Group duplicated",
+        description: `Created "${newGroup.name}" with ${newGroup.contactIds.length} contacts. You can now customize it.`
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Failed to duplicate group",
+        variant: "destructive"
+      });
+    }
+  });
+
   const bulkDeleteMutation = useMutation({
     mutationFn: async (groupIds: string[]) => {
       await Promise.all(groupIds.map(id => firebaseApi.groups.delete(id)));
@@ -134,9 +151,20 @@ export default function GroupsPage() {
     setIsOpen(true);
   };
 
-  const openDeleteDialog = (groupId: string, event: React.MouseEvent) => {
+  const openDeleteDialog = (groupId: string, event: React.MouseEvent, group: Group) => {
     event.preventDefault(); // Prevent navigation to group detail
     event.stopPropagation(); // Prevent event bubbling
+    
+    // Prevent deletion of system groups
+    if (group.isSystem) {
+      toast({ 
+        title: "Cannot delete system group",
+        description: "The All Contacts group is protected. You can disable it in the group settings.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setDeleteGroupId(groupId);
   };
 
@@ -151,7 +179,17 @@ export default function GroupsPage() {
     setSelectedGroups(new Set());
   };
 
-  const toggleGroupSelection = (groupId: string) => {
+  const toggleGroupSelection = (groupId: string, group: Group) => {
+    // Don't allow selecting system groups
+    if (group.isSystem) {
+      toast({ 
+        title: "Cannot select system group",
+        description: "The All Contacts group is protected and cannot be deleted.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const newSelected = new Set(selectedGroups);
     if (newSelected.has(groupId)) {
       newSelected.delete(groupId);
@@ -163,7 +201,9 @@ export default function GroupsPage() {
 
   const selectAllGroups = () => {
     if (groups) {
-      setSelectedGroups(new Set(groups.map(g => g.id)));
+      // Don't select system groups
+      const selectableGroups = groups.filter(g => !g.isSystem);
+      setSelectedGroups(new Set(selectableGroups.map(g => g.id)));
     }
   };
 
@@ -187,6 +227,12 @@ export default function GroupsPage() {
     if (selectedGroups.size > 0) {
       bulkToggleEnabledMutation.mutate({ groupIds: Array.from(selectedGroups), enabled: false });
     }
+  };
+
+  const handleDuplicateGroup = (groupId: string, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    duplicateMutation.mutate(groupId);
   };
 
   return (
@@ -304,7 +350,7 @@ export default function GroupsPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {groups?.map((group) => (
             <div key={group.id} className="block h-full">
-              <Card className={`h-full interactive-card group ${selectedGroups.has(group.id) ? 'ring-2 ring-primary' : ''}`}>
+              <Card className={`h-full interactive-card group ${selectedGroups.has(group.id) ? 'ring-2 ring-primary' : ''} ${group.isSystem ? 'border-blue-200 dark:border-blue-800' : ''}`}>
                 <CardHeader>
                   <CardTitle className="flex justify-between items-start">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -312,29 +358,49 @@ export default function GroupsPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleGroupSelection(group.id);
+                            toggleGroupSelection(group.id, group);
                           }}
                           className="flex-shrink-0"
+                          disabled={group.isSystem}
                         >
                           {selectedGroups.has(group.id) ? (
                             <CheckSquare className="h-5 w-5 text-primary" />
                           ) : (
-                            <Square className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                            <Square className={`h-5 w-5 ${group.isSystem ? 'text-muted-foreground/30' : 'text-muted-foreground hover:text-primary'}`} />
                           )}
                         </button>
                       )}
                       <span className="hover:text-primary transition-colors truncate">{group.name}</span>
+                      {group.isSystem && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-medium">
+                          <Shield className="h-3 w-3" />
+                          System
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {!isSelectionMode && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => openDeleteDialog(group.id, e)}
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleDuplicateGroup(group.id, e)}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                            title={group.isSystem ? "Create a copy you can customize" : "Duplicate this group"}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                          {!group.isSystem && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => openDeleteDialog(group.id, e, group)}
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </>
                       )}
                       <Users className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors hover-scale" />
                     </div>
@@ -345,6 +411,7 @@ export default function GroupsPage() {
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                       <span className="font-medium text-foreground">{group.contactIds.length}</span> members
+                      {group.isSystem && <span className="text-xs ml-1">(auto-synced)</span>}
                     </div>
                     {group.enabled !== undefined && (
                       <div className={`text-xs px-2 py-1 rounded-full ${
@@ -359,6 +426,14 @@ export default function GroupsPage() {
                   <div className="mt-4 text-xs text-muted-foreground line-clamp-2 bg-secondary/50 p-2 rounded hover:bg-secondary/70 transition-colors">
                     AI Context: {group.backgroundInfo}
                   </div>
+                  {group.isSystem && (
+                    <div className="mt-3 p-2 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-100">
+                      <p className="flex items-start gap-1.5">
+                        <Copy className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        <span><strong>Tip:</strong> Need everyone except one person? Click the copy button above to create a customizable version.</span>
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter className="pt-0">
                   {!isSelectionMode ? (
@@ -371,9 +446,10 @@ export default function GroupsPage() {
                     <Button
                       variant="ghost"
                       className="w-full justify-center interactive-button px-0 text-muted-foreground"
-                      onClick={() => toggleGroupSelection(group.id)}
+                      onClick={() => toggleGroupSelection(group.id, group)}
+                      disabled={group.isSystem}
                     >
-                      {selectedGroups.has(group.id) ? 'Selected' : 'Click to select'}
+                      {selectedGroups.has(group.id) ? 'Selected' : group.isSystem ? 'Protected' : 'Click to select'}
                     </Button>
                   )}
                 </CardFooter>

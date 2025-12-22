@@ -33,6 +33,21 @@
           "destination": "/index.html"
         }
       ]
+    },
+    {
+      "site": "contact-hub-net-working",
+      "public": "dist/public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
     }
   ],
   "functions": [

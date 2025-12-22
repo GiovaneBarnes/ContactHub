@@ -4,8 +4,10 @@ import { firebaseApi } from './firebase-api';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, updateProfile } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { metricsService } from './metrics';
+import { getUserTimezone } from './timezone-utils';
 
 interface AuthContextType {
   user: User | null;
@@ -25,12 +27,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Listen to auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Load user profile from Firestore to get timezone
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        const userData = userDoc.data();
+        
+        const userTimezone = userData?.timezone || getUserTimezone();
+        
+        // If timezone not stored, store it now
+        if (!userData?.timezone) {
+          await setDoc(doc(db, 'users', firebaseUser.uid), {
+            timezone: userTimezone,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || firebaseUser.email,
+          }, { merge: true });
+        }
+        
         setUser({
           id: firebaseUser.uid,
           email: firebaseUser.email || '',
-          name: firebaseUser.displayName || firebaseUser.email || ''
+          name: firebaseUser.displayName || firebaseUser.email || '',
+          timezone: userTimezone,
+          preferences: userData?.preferences,
         });
       } else {
         setUser(null);
@@ -63,10 +82,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await updateProfile(userCredential.user, {
         displayName: name
       });
+      
+      // Store user profile with timezone in Firestore
+      const userTimezone = getUserTimezone();
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email,
+        name,
+        timezone: userTimezone,
+        createdAt: new Date().toISOString(),
+      });
+      
       // Wait a moment for auth state to propagate before redirecting
       await new Promise(resolve => setTimeout(resolve, 100));
       setLocation('/');
-      toast({ title: "Account created", description: "Welcome to Contact App!" });
+      toast({ title: "Account created", description: "Welcome to ContactHub!" });
       await metricsService.trackUserEngagement('signup', { method: 'email' });
     } catch (e) {
       await metricsService.trackUserEngagement('signup_failed', { error: (e as Error).message });

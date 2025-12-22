@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import NotificationBell from "@/components/notification-bell";
 import { useState, lazy, Suspense } from "react";
 
 // Lazy load heavy AI components to avoid initialization issues
@@ -188,11 +189,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Mobile Header */}
         <div className="md:hidden fixed top-0 left-0 right-0 h-16 glass border-b border-border/50 z-50 flex items-center px-4 justify-between backdrop-blur-xl">
           <Link href="/">
-            <h1 className="text-lg font-bold font-display text-gradient hover:text-primary/80 transition-colors cursor-pointer">
-              ContactHub
+            <h1 className="text-lg font-bold font-display tracking-tight text-gradient hover:text-primary/80 transition-colors cursor-pointer">
+              Contact<span className="text-primary">Hub</span>
             </h1>
           </Link>
           <div className="flex items-center gap-2">
+            {user && <NotificationBell />}
             <ThemeToggle />
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
@@ -210,6 +212,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Main Content */}
         <main className="flex-1 overflow-auto md:h-screen pt-16 md:pt-0 relative">
           <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20 -z-10" />
+          {/* Desktop Header with Notification Bell */}
+          {user && (
+            <div className="hidden md:flex items-center justify-end gap-2 px-8 pt-6 pb-2">
+              <NotificationBell />
+            </div>
+          )}
           <div className="container mx-auto max-w-6xl p-6 md:p-8 relative">
             {children}
           </div>

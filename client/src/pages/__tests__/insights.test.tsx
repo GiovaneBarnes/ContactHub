@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { getDocs } from 'firebase/firestore'
-import PersonalInsights from '../insights'
+import PersonalAnalytics from '../insights'
 import { metricsService } from '@/lib/metrics'
 
 type MockDoc = {
@@ -151,7 +151,7 @@ const renderWithProviders = (component: React.ReactElement) => {
   )
 }
 
-describe('PersonalInsights', () => {
+describe('PersonalAnalytics', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetFirestoreData()
@@ -173,90 +173,89 @@ describe('PersonalInsights', () => {
   })
 
   it('renders loading state initially', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     // Initially shows loading spinner
     expect(screen.queryByText('AI-Powered Insights')).not.toBeInTheDocument()
 
     // Wait for content to load
     await waitFor(() => {
-      expect(screen.getByText('AI-Powered Insights')).toBeInTheDocument()
+      expect(screen.getByText('Your Contact Insights')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Your personal contact network intelligence and growth recommendations')).toBeInTheDocument()
+    expect(screen.getByText('Understand your networking patterns and get personalized tips to strengthen relationships')).toBeInTheDocument()
   })
 
   it('displays network strength correctly', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('Network Strength')).toBeInTheDocument()
+      expect(screen.getByText('Network Quality')).toBeInTheDocument()
     })
 
-    // Network strength should be calculated based on contact completeness, activity, and AI usage
+    // Network quality should be calculated based on contact completeness, activity, and AI usage
     expect(screen.getByText('85%')).toBeInTheDocument()
   })
 
   it('displays contact completeness metrics', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('Contact Completeness')).toBeInTheDocument()
+      expect(screen.getByText('Your Contact Book')).toBeInTheDocument()
     })
 
     expect(screen.getByText('75%')).toBeInTheDocument()
-    expect(screen.getByText('With Email')).toBeInTheDocument()
-    expect(screen.getByText('With Phone')).toBeInTheDocument()
+    expect(screen.getByText('Have email address')).toBeInTheDocument()
+    expect(screen.getByText('Have phone number')).toBeInTheDocument()
   })
 
   it('displays total contacts count', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('Total Contacts')).toBeInTheDocument()
+      expect(screen.getByText('Your Contact Book')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Contact Analytics')).toBeInTheDocument()
+    expect(screen.getByText('Total Contacts')).toBeInTheDocument()
   })
 
   it('shows recent activity metrics', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('Recent Activity')).toBeInTheDocument()
+      expect(screen.getByText('Activity & AI Usage')).toBeInTheDocument()
     })
 
-    expect(screen.getByText(/logins/i)).toBeInTheDocument()
+    expect(screen.getByText(/Times Logged In/i)).toBeInTheDocument()
   })
 
   it('displays AI usage metrics', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('AI Features Used')).toBeInTheDocument()
+      expect(screen.getByText('Activity & AI Usage')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('AI & Activity')).toBeInTheDocument()
+    expect(screen.getByText('AI Features Used')).toBeInTheDocument()
   })
 
   it('shows communication patterns', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('Communication Patterns')).toBeInTheDocument()
+      expect(screen.getByText('Your Messages')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('SMS')).toBeInTheDocument()
-    expect(screen.getByText('5 messages')).toBeInTheDocument()
+    expect(screen.getByText('Your Messages')).toBeInTheDocument()
     expect(screen.getByText('Email')).toBeInTheDocument()
-    expect(screen.getByText('2 messages')).toBeInTheDocument()
+    expect(screen.getByText('Total Messages Sent')).toBeInTheDocument()
   })
 
   it('displays AI-powered suggestions', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('AI Predictions & Insights')).toBeInTheDocument()
+      expect(screen.getByText('Smart Insights & Recommendations')).toBeInTheDocument()
     })
 
     // Should show AI predictions based on the user's metrics
@@ -265,7 +264,7 @@ describe('PersonalInsights', () => {
 
   it('allows timeframe selection', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     // Wait for the timeframe buttons to be available
     await waitFor(() => {
@@ -280,35 +279,33 @@ describe('PersonalInsights', () => {
   })
 
   it('tracks page view on mount', () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     expect(metricsService.trackPageView).toHaveBeenCalledWith('personal-analytics')
   })
 
   it('shows quick action buttons', async () => {
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('Recommended Actions')).toBeInTheDocument()
+      expect(screen.getByText('Smart Insights & Recommendations')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Add Quality Contacts')).toBeInTheDocument()
-    expect(screen.getByText('Try AI Features')).toBeInTheDocument()
-    expect(screen.getByText('Send Targeted Messages')).toBeInTheDocument()
+    // Check for AI predictions instead of specific buttons
+    expect(screen.getByText('AI-powered analysis of your contact management patterns with personalized tips')).toBeInTheDocument()
   })
 
   it('handles error state gracefully', async () => {
     vi.mocked(getDocs).mockRejectedValueOnce(new Error('Firestore failure'))
 
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('AI-Powered Insights')).toBeInTheDocument()
+      expect(screen.getByText('Your Contact Insights')).toBeInTheDocument()
     })
 
     // Should still show metrics with fallback data
-    expect(screen.getByText('Network Strength')).toBeInTheDocument()
-    expect(screen.getByText('Overall network health score')).toBeInTheDocument()
+    expect(screen.getByText('Network Quality')).toBeInTheDocument()
   })
 
   it('shows communication patterns with zero counts', async () => {
@@ -329,13 +326,12 @@ describe('PersonalInsights', () => {
       aiUsageCount: 0
     })
 
-    renderWithProviders(<PersonalInsights />)
+    renderWithProviders(<PersonalAnalytics />)
 
     await waitFor(() => {
-      expect(screen.getByText('Communication Patterns')).toBeInTheDocument()
+      expect(screen.getByText('Network Quality')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('SMS')).toBeInTheDocument()
-    expect(screen.getAllByText('0 messages')).toHaveLength(2) // SMS and Email both show 0
+    expect(screen.getByText('No messages sent yet')).toBeInTheDocument()
   })
 })

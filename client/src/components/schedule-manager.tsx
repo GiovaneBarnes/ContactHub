@@ -11,6 +11,8 @@ import { Calendar, Clock, Plus, Trash2, Edit } from 'lucide-react';
 import { Schedule } from '@/lib/types';
 import { formatSchedule, getNextOccurrences } from '@/lib/schedule-utils';
 import { generateId } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
+import { formatScheduleTime } from '@/lib/timezone-utils';
 
 // Holiday date calculation functions
 function getThanksgivingDate(year: number): string {
@@ -158,6 +160,7 @@ interface ScheduleManagerProps {
 }
 
 export function ScheduleManager({ schedules, onSchedulesChange }: ScheduleManagerProps) {
+  const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
 
@@ -185,7 +188,8 @@ export function ScheduleManager({ schedules, onSchedulesChange }: ScheduleManage
     setEditingSchedule(null);
   };
 
-  const nextOccurrences = getNextOccurrences(schedules.filter(s => s.enabled), new Date(), 3);
+  const nextOccurrences = getNextOccurrences(schedules.filter(s => s.enabled), new Date(), 3)
+    .filter(occurrence => occurrence.date && !isNaN(occurrence.date.getTime()));
 
   return (
     <div className="space-y-4">
@@ -208,14 +212,22 @@ export function ScheduleManager({ schedules, onSchedulesChange }: ScheduleManage
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center">
               <Clock className="w-4 h-4 mr-2" />
-              Upcoming Contacts
+              Next 3 Messages
             </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Upcoming automated messages based on your active schedules
+            </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {nextOccurrences.slice(0, 3).map((occurrence, index) => (
-                <div key={index} className="flex items-center justify-between text-sm">
-                  <span>{occurrence.date.toLocaleDateString()}</span>
+                <div key={index} className="flex items-center justify-between text-sm p-2 rounded-md bg-muted/30">
+                  <span className="font-medium">
+                    {occurrence.date && !isNaN(occurrence.date.getTime()) 
+                      ? formatScheduleTime(occurrence.date.toISOString(), undefined, user?.timezone)
+                      : 'Invalid date'
+                    }
+                  </span>
                   {occurrence.scheduleName && (
                     <Badge variant="secondary" className="text-xs">
                       {occurrence.scheduleName}

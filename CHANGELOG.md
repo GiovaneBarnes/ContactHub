@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-12-22
+
+### 🧪 Testing & Quality Assurance
+- **Comprehensive Test Suite Improvements**: Enhanced test coverage and reliability
+  - **Onboarding Wizard Tests**: Expanded from 23 to 38 tests (65% increase)
+    - Added 15 new test cases covering edge cases and user interactions
+    - Achieved comprehensive coverage of contact creation, group management, AI message generation, and scheduling flows
+    - Fixed textarea editing tests using keyboard selection instead of clear()
+    - Corrected button expectations (Continue vs Skip to Scheduling)
+    - Added tests for completion message variations based on user choices
+  - **Notification Service Tests**: Fixed 9 failing tests and improved mocks
+    - Updated Firebase Firestore mocks to properly return promises
+    - Fixed query composition for filtering and pagination
+    - Corrected document reference handling with proper ID tracking
+    - Replaced `vi.mocked()` with `vi.spyOn()` for method mocking
+  - **All Tests Passing**: 352 tests passing, 9 skipped (361 total)
+
+### 🔧 TypeScript & Code Quality
+- **Complete Type Safety**: Fixed all 19 TypeScript errors in test files
+  - Removed invalid `userId` and `createdAt` properties from mock objects
+  - Added proper type imports (`Group`, `Contact`) from `@/lib/types`
+  - Implemented type casts (`as Contact`, `as Group`) for test mocks
+  - Provided complete object structures with all required properties
+  - Removed reference to non-existent `firebaseApi.contacts.import` method
+- **Enhanced Mock Objects**: Improved test data quality
+  - Standardized Group mocks with all required fields (description, schedules, backgroundInfo, enabled)
+  - Standardized Contact mocks with all required fields (notes, email, phone)
+  - Fixed default mock return values in test setup to include complete objects
+
+### 🛠️ Build & Development
+- **Zero Build Errors**: Clean TypeScript compilation with `npm run check`
+- **Zero Test Failures**: All test suites passing with `npm test`
+- **Improved Developer Experience**: Type-safe test environment with proper IDE support
+
+### 📝 Code Maintenance
+- **Test Code Cleanup**: Removed duplicate lines and syntax errors
+- **Consistent Mocking Patterns**: Standardized approach across all test files
+- **Better Test Documentation**: Clear test descriptions and expectations
+
 ## [1.2.1] - 2025-12-20
 
 ### 🐛 Fixed

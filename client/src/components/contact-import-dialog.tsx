@@ -209,6 +209,23 @@ export function ContactImportDialog({
                 </div>
               </div>
 
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-2">
+                  <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-900 dark:text-blue-100">Limited Beta Access</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      Google Contacts import is currently in beta with limited slots (100 test users). 
+                      <strong> Interested in early access?</strong> Email us at{" "}
+                      <a href="mailto:contacthubwebapp@gmail.com?subject=Google Contacts Beta Access Request" className="underline font-medium hover:text-blue-900 dark:hover:text-blue-200">
+                        contacthubwebapp@gmail.com
+                      </a>
+                      {" "}to request access.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
                 <div className="flex items-start gap-2">
                   <Info className="h-4 w-4 text-amber-600 mt-0.5" />

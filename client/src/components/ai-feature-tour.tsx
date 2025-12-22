@@ -245,33 +245,33 @@ export function AIFeatureTour({ forceOpen = false, onComplete }: AIFeatureTourPr
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) handleSkip();
     }}>
-      <DialogContent className="max-w-2xl" hideClose>
+      <DialogContent className="max-w-2xl sm:max-h-[85vh]" hideClose>
         <DialogHeader>
-          <Badge variant="secondary" className="text-xs mb-2">
+          <Badge variant="secondary" className="text-xs mb-2 w-fit">
             {currentStep + 1} of {tourSteps.length}
           </Badge>
-          <DialogTitle className="text-2xl">{step.title}</DialogTitle>
-          <DialogDescription className="text-base">
+          <DialogTitle className="text-xl sm:text-2xl">{step.title}</DialogTitle>
+          <DialogDescription className="text-sm sm:text-base">
             {step.description}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
           {/* Icon Display */}
-          <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mx-auto", step.iconBg)}>
-            <step.icon className={cn("h-8 w-8", step.iconColor)} />
+          <div className={cn("w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto", step.iconBg)}>
+            <step.icon className={cn("h-6 w-6 sm:h-8 sm:w-8", step.iconColor)} />
           </div>
 
           {/* Feature List */}
           <Card className="bg-muted/50">
-            <CardContent className="pt-6">
-              <ul className="space-y-3">
-                {step.features.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <div className="bg-primary/10 rounded-full p-1 mt-0.5">
+            <CardContent className="pt-4 sm:pt-6">
+              <ul className="space-y-2 sm:space-y-3">
+                {step.features.slice(0, isFirstStep ? 5 : 4).map((feature, index) => (
+                  <li key={index} className="flex items-start gap-2 sm:gap-3">
+                    <div className="bg-primary/10 rounded-full p-1 mt-0.5 flex-shrink-0">
                       <Check className="h-3 w-3 text-primary" />
                     </div>
-                    <span className="text-sm flex-1">{feature}</span>
+                    <span className="text-xs sm:text-sm flex-1 leading-relaxed">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -298,31 +298,32 @@ export function AIFeatureTour({ forceOpen = false, onComplete }: AIFeatureTourPr
           </div>
 
           {/* Navigation */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
             <Button
               variant="ghost"
               onClick={handlePrevious}
               disabled={isFirstStep}
-              className="gap-2"
+              className="gap-2 order-2 sm:order-1"
+              size="sm"
             >
               <ChevronLeft className="h-4 w-4" />
-              Previous
+              <span className="hidden sm:inline">Previous</span>
             </Button>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 order-1 sm:order-2">
               {!isLastStep && (
-                <Button variant="outline" onClick={handleSkip}>
-                  Skip Tour
+                <Button variant="outline" onClick={handleSkip} size="sm" className="flex-1 sm:flex-none">
+                  Skip
                 </Button>
               )}
               {!isLastStep && (
-                <Button variant="outline" onClick={handleNext} className="gap-2">
+                <Button variant="outline" onClick={handleNext} className="gap-2 flex-1 sm:flex-none" size="sm">
                   Next
                   <ChevronRightIcon className="h-4 w-4" />
                 </Button>
               )}
-              <Button onClick={handleCTA} className="gap-2">
-                {step.ctaText}
+              <Button onClick={handleCTA} className="gap-2 flex-1 sm:flex-none" size="sm">
+                <span className="truncate">{step.ctaText}</span>
                 {step.ctaLink && <ChevronRightIcon className="h-4 w-4" />}
               </Button>
             </div>
@@ -370,36 +371,37 @@ export function AIFeaturesBanner() {
     <>
       {showBanner && (
         <div className="bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500 text-white">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 rounded-full p-2">
-                  <Sparkles className="h-5 w-5" />
+          <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3">
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                <div className="bg-white/20 rounded-full p-1.5 sm:p-2 flex-shrink-0">
+                  <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <div>
-                  <p className="font-semibold">
-                    ✨ Discover AI-Powered Features
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm sm:text-base">
+                    ✨ AI-Powered Features
                   </p>
-                  <p className="text-sm text-white/90">
+                  <p className="text-xs sm:text-sm text-white/90 hidden sm:block">
                     Let AI help you build stronger relationships with smart insights, personalized messages, and more
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <Button
                   onClick={handleStartTour}
                   variant="secondary"
                   size="sm"
-                  className="gap-2 whitespace-nowrap"
+                  className="gap-1 sm:gap-2 whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  Take Tour
+                  <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Take Tour</span>
+                  <span className="sm:hidden">Tour</span>
                 </Button>
                 <Button
                   onClick={handleDismiss}
                   variant="ghost"
                   size="sm"
-                  className="text-white hover:bg-white/20"
+                  className="text-white hover:bg-white/20 h-8 w-8 sm:h-9 sm:w-9 p-0"
                 >
                   <X className="h-4 w-4" />
                 </Button>

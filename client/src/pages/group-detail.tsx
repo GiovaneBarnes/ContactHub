@@ -10,10 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Send, Users, Settings, Calendar, Clock, MessageSquare, BarChart3, Plus, Search } from "lucide-react";
+import { Loader2, Sparkles, Send, Users, Settings, Calendar, Clock, MessageSquare, BarChart3, Plus, Search, Info } from "lucide-react";
 import { ScheduleManager } from "@/components/schedule-manager";
 import { Schedule, Group } from "@/lib/types";
 import { format, isAfter, isBefore, addDays } from "date-fns";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 export default function GroupDetailPage() {
   const [, params] = useRoute("/groups/:id");
@@ -100,12 +101,17 @@ export default function GroupDetailPage() {
       });
     }
   });  const sendMutation = useMutation({
-    mutationFn: () => firebaseApi.messaging.send(id!, generatedMessage, ['sms', 'email']),
+    mutationFn: () => {
+      // If SMS is disabled, only send via email
+      const channels = isFeatureEnabled('SMS_ENABLED') ? ['sms', 'email'] : ['email'];
+      return firebaseApi.messaging.send(id!, generatedMessage, channels as any);
+    },
     onSuccess: () => {
       setGeneratedMessage("");
       // Invalidate logs query to refresh the logs page
       queryClient.invalidateQueries({ queryKey: ['logs'] });
-      toast({ title: "Message sent!", description: "Check logs for delivery status." });
+      const method = isFeatureEnabled('SMS_ENABLED') ? 'Message' : 'Email';
+      toast({ title: `${method} sent!`, description: "Check logs for delivery status." });
     },
     onError: (error) => {
       toast({ 
@@ -521,6 +527,25 @@ export default function GroupDetailPage() {
 
               {/* Generate Message */}
               <div className="space-y-4">
+                {/* SMS Temporary Notice */}
+                {!isFeatureEnabled('SMS_ENABLED') && (
+                  <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4">
+                    <div className="flex gap-3">
+                      <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                          SMS Temporarily Unavailable
+                        </h4>
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          Our SMS service is completing carrier verification (expected Dec 23-26). 
+                          <strong> Messages will be sent via email only</strong> until verification completes. 
+                          All functionality will work normally—just email delivery for now.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <Button
                   onClick={() => generateAiMutation.mutate()}
                   disabled={generateAiMutation.isPending}
@@ -555,6 +580,7 @@ export default function GroupDetailPage() {
                     <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                       <div className="text-sm text-muted-foreground">
                         Ready to send to {(group.contactIds || []).length} member{(group.contactIds || []).length !== 1 ? 's' : ''}
+                        {!isFeatureEnabled('SMS_ENABLED') && <span className="block text-xs mt-1 text-blue-600 dark:text-blue-400">via Email only</span>}
                       </div>
                       <Button
                         onClick={() => sendMutation.mutate()}
@@ -569,7 +595,7 @@ export default function GroupDetailPage() {
                         ) : (
                           <>
                             <Send className="mr-2 h-4 w-4" />
-                            Send Message
+                            {isFeatureEnabled('SMS_ENABLED') ? 'Send Message' : 'Send Email'}
                           </>
                         )}
                       </Button>

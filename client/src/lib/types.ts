@@ -1,10 +1,14 @@
+import { NotificationPreferences } from './notification-types';
+
 export interface User {
   id: string;
   email: string;
   name: string;
+  timezone?: string; // User's primary timezone
   preferences?: {
     hasCompletedOnboarding?: boolean;
     onboardingCompletedAt?: string;
+    notifications?: NotificationPreferences;
   };
 }
 
@@ -44,6 +48,7 @@ export interface Schedule {
   };
   exceptions?: string[]; // ISO date strings to skip
   enabled: boolean;
+  timezone?: string; // User's timezone when schedule was created (IANA format)
 }
 
 export interface Group {
@@ -54,6 +59,7 @@ export interface Group {
   schedules: Schedule[];
   backgroundInfo: string;
   enabled: boolean;
+  isSystem?: boolean; // System groups like "All Contacts" cannot be deleted
 }
 
 export interface MessageLog {

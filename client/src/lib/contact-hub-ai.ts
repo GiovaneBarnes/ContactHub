@@ -132,22 +132,73 @@ const fallbackCommunicationAnalysis = (name: string, messageLogs?: any[], lastCo
   };
 };
 
-const fallbackSchedulingSuggestion = (name: string, timezone: string = 'UTC', communicationStyle: string = 'professional') => {
+const fallbackSchedulingSuggestion = (name: string, timezone: string = 'America/New_York', communicationStyle: string = 'professional', userTimezone?: string) => {
   const now = new Date();
   const isProfessional = communicationStyle.toLowerCase().includes('professional') || 
                         communicationStyle.toLowerCase().includes('business');
   
-  // Generate appropriate time based on style
-  const recommendedDay = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000)); // 2 days from now
-  const dayName = recommendedDay.toLocaleDateString('en-US', { weekday: 'long' });
-  const primaryTime = isProfessional ? '10:00 AM' : '7:00 PM';
+  // Get timezone abbreviation helper
+  const getTimezoneAbbr = (tz: string) => {
+    try {
+      const date = new Date();
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        timeZoneName: 'short'
+      }).formatToParts(date);
+      return parts.find(p => p.type === 'timeZoneName')?.value || tz;
+    } catch {
+      return tz.split('/').pop() || tz;
+    }
+  };
+  
+  const tzAbbr = getTimezoneAbbr(timezone);
+  
+  // Generate smart, realistic alternatives
+  const generateScheduleOption = (daysFromNow: number, hour: number): string => {
+    const targetDate = new Date(now.getTime() + daysFromNow * 24 * 60 * 60 * 1000);
+    
+    // Skip weekends for professional contacts
+    if (isProfessional) {
+      while (targetDate.getDay() === 0 || targetDate.getDay() === 6) {
+        targetDate.setDate(targetDate.getDate() + 1);
+      }
+    }
+    
+    const dayName = targetDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    
+    return `${dayName}, ${displayHour}:00 ${period} ${tzAbbr}`;
+  };
+  
+  // Professional: Weekday business hours (9 AM - 5 PM)
+  // Personal: Flexible including weekends (10 AM - 8 PM)
+  const scheduleOptions = isProfessional ? [
+    generateScheduleOption(1, 10),  // Next business day, 10 AM
+    generateScheduleOption(2, 14),  // +2 business days, 2 PM
+    generateScheduleOption(3, 11),  // +3 business days, 11 AM
+    generateScheduleOption(4, 15),  // +4 business days, 3 PM
+  ] : [
+    generateScheduleOption(1, 10),  // Tomorrow, 10 AM
+    generateScheduleOption(1, 18),  // Tomorrow, 6 PM
+    generateScheduleOption(2, 11),  // +2 days, 11 AM
+    generateScheduleOption(3, 19),  // +3 days, 7 PM
+  ];
+  
+  // Remove duplicates and take 4 unique options
+  const uniqueOptions = Array.from(new Set(scheduleOptions)).slice(0, 4);
   
   return {
-    recommendedTime: `${dayName}, ${primaryTime} ${timezone}`,
-    reasoning: `${isProfessional ? 'Mid-morning business hours' : 'Evening personal time'} in ${timezone} timezone. Selected to respect ${communicationStyle} communication style and typical availability patterns.`,
-    alternatives: isProfessional 
-      ? [`Tuesday, 2:00 PM ${timezone}`, `Wednesday, 9:30 AM ${timezone}`, `Thursday, 3:00 PM ${timezone}`]
-      : [`Saturday, 11:00 AM ${timezone}`, `Sunday, 2:00 PM ${timezone}`, `Friday, 6:30 PM ${timezone}`]
+    recommendedTime: uniqueOptions[0],
+    reasoning: isProfessional 
+      ? `Mid-morning on the next business day in ${tzAbbr} timezone provides optimal professional outreach timing. This respects business hours and maximizes response likelihood.`
+      : `Next-day morning in ${tzAbbr} timezone balances availability with timely outreach. This timing works well for personal communication.`,
+    alternatives: uniqueOptions.slice(1, 4)
   };
 };
 
@@ -340,11 +391,12 @@ export class ContactHubAI {
   static async suggestContactTime(
     contactId: string,
     name: string,
-    timezone: string = 'UTC',
+    timezone: string = 'America/New_York',
     preferredTimes?: string[],
     communicationStyle: string = 'professional',
     lastContact?: string,
-    responsePatterns?: string[]
+    responsePatterns?: string[],
+    userTimezone?: string
   ): Promise<{
     recommendedTime: string;
     reasoning: string;
@@ -358,11 +410,12 @@ export class ContactHubAI {
         preferredTimes,
         communicationStyle,
         lastContact,
-        responsePatterns
+        responsePatterns,
+        userTimezone
       });
       return result.data as any;
     } catch (error) {
-      return fallbackSchedulingSuggestion(name, timezone, communicationStyle);
+      return fallbackSchedulingSuggestion(name, timezone, communicationStyle, userTimezone);
     }
   }
 

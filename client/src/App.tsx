@@ -39,6 +39,7 @@ const LogsPage = lazyRetry(() => import("@/pages/logs"));
 const AnalyticsDashboard = lazyRetry(() => import("@/pages/analytics"));
 const PersonalInsights = lazyRetry(() => import("@/pages/insights"));
 const SettingsPage = lazyRetry(() => import("@/pages/settings"));
+const NotificationsPage = lazyRetry(() => import("@/pages/notifications"));
 const TermsPage = lazyRetry(() => import("@/pages/terms"));
 const PrivacyPage = lazyRetry(() => import("@/pages/privacy"));
 
@@ -63,7 +64,7 @@ const PageLoader = () => (
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -76,8 +77,12 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
     );
   }
 
-  if (!user) {
+  if (!user && location !== '/auth') {
     setLocation("/auth");
+    return null;
+  }
+
+  if (!user) {
     return null;
   }
 
@@ -124,6 +129,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         <ProtectedRoute component={SettingsPage} />
+      </Route>
+      <Route path="/notifications">
+        <ProtectedRoute component={NotificationsPage} />
       </Route>
 
         <Route component={NotFound} />

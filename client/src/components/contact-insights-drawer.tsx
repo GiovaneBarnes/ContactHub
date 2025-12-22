@@ -8,6 +8,8 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Contact } from "@/lib/types";
 import { firebaseApi } from "@/lib/firebase-api";
+import { useAuth } from "@/lib/auth-context";
+import { formatInUserTimezone, formatScheduleTime, parseToUserTimezone } from "@/lib/timezone-utils";
 import {
   Brain,
   CalendarDays,
@@ -53,6 +55,7 @@ const infoChips = (items: string[] | undefined, variant: "category" | "tag") => 
 
 export function ContactInsightsDrawer({ contact, open, onOpenChange }: ContactInsightsDrawerProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [copied, setCopied] = useState(false);
   const contactId = contact?.id;
 
@@ -118,17 +121,13 @@ export function ContactInsightsDrawer({ contact, open, onOpenChange }: ContactIn
   const lastContactLabel = useMemo(() => {
     if (!contact?.lastContact) return "No recent activity";
     try {
-      return new Date(contact.lastContact).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
+      return formatInUserTimezone(contact.lastContact, 'MMM d, yyyy zzz', user?.timezone);
     } catch (error) {
       return contact.lastContact;
     }
-  }, [contact?.lastContact]);
+  }, [contact?.lastContact, user?.timezone]);
 
-  // Format timing recommendation with actual date/time in user's timezone
+  // Format timing recommendation with actual date/time in user's CURRENT timezone
   const formatTimingRecommendation = (recommendation: string): { date: string; time: string; full: string } => {
     try {
       // Parse common patterns like "Next business day, 9 AM" or "Tomorrow 2 PM"
@@ -164,10 +163,16 @@ export function ContactInsightsDrawer({ contact, open, onOpenChange }: ContactIn
 
       targetDate.setHours(targetHour, 0, 0, 0);
 
+      // Format in user's CURRENT timezone
+      const userTimezone = user?.timezone;
+      const dateStr = formatInUserTimezone(targetDate.toISOString(), 'EEE, MMM d', userTimezone);
+      const timeStr = formatInUserTimezone(targetDate.toISOString(), 'h:mm a zzz', userTimezone);
+      const fullStr = formatInUserTimezone(targetDate.toISOString(), 'EEEE, MMMM d', userTimezone) + ' at ' + timeStr;
+
       return {
-        date: targetDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
-        time: targetDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }),
-        full: `${targetDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} at ${targetDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}`
+        date: dateStr,
+        time: timeStr,
+        full: fullStr
       };
     } catch (error) {
       return { date: '', time: '', full: recommendation };
